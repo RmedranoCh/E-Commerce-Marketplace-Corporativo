@@ -1,0 +1,7 @@
+Flask==3.0.2
+Flask-SQLAlchemy==3.1.1
+PyJWT==2.8.0
+cryptography==42.0.5
+Werkzeug==3.0.1
+gunicorn==21.2.0
+gevent==24.2.1

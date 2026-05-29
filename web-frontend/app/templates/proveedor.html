@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CYBERCORE // Panel de Control del Proveedor</title>
+    <link rel="stylesheet" href="/static/css/base.css">
+    <link rel="stylesheet" href="/static/css/proveedor.css">
+    <link href="https://googleapis.com" rel="stylesheet">
+    <link rel="stylesheet" href="https://cloudflare.com">
+</head>
+<body class="vendor-body">
+
+    <header class="vendor-panel-header">
+        <div>
+            <h1><i class="fa-solid fa-satellite-dish" style="color: var(--accent-vendor-cyan); margin-right: 8px;"></i>TERMINAL DE ABASTECIMIENTO LOGÍSTICO</h1>
+            <p>CONEXIÓN EN VIVO // SUBRED AISLADA `data-isolated` // MESH: order-service</p>
+        </div>
+        <div>
+            {% if username %}
+                <span class="brand-badge" style="margin-right: 12px;">PROVEEDOR: {{ username }}</span>
+                <a href="/proveedor/logout" class="btn-logout"><i class="fa-solid fa-power-off"></i> CERRAR_SESION</a>
+            {% endif %}
+        </div>
+    </header>
+
+    <div class="system-logs" style="margin-bottom: 24px;">
+        <span class="status-badge">
+            <span class="pulse-dot"></span>
+            <span id="console-log-text">{{ msg }}</span>
+        </span>
+        <span style="font-family: var(--font-mono); font-size: 11px; color: var(--text-vendor-muted);">BFF-GATEWAY // STABLE</span>
+    </div>
+
+    <main class="main-content">
+        {% if vista == "registro" %}
+        <div class="vendor-card" style="max-width: 500px; margin: 40px auto;">
+            <h2>INITIALIZE CORE VENDOR</h2>
+            <p class="subtitle">No se detectan credenciales maestras en la red distribuida. Registre el nodo inicial.</p>
+            <form action="/proveedor/register" method="POST" class="form-group" style="margin-top: 20px;">
+                <div>
+                    <label class="vendor-label">NOMBRE_USUARIO</label>
+                    <input type="text" name="username" required class="vendor-input" placeholder="Ej: admin_hardware">
+                </div>
+                <div>
+                    <label class="vendor-label">EMAIL</label>
+                    <input type="email" name="email" required class="vendor-input" placeholder="proveedor@cybercore.idx">
+                </div>
+                <div>
+                    <label class="vendor-label">PASSWORD</label>
+                    <input type="password" name="password" required class="vendor-input" placeholder="••••••••">
+                </div>
+                <button type="submit" class="btn-vendor btn-green" style="margin-top: 10px;">Compilar e Inicializar Nodo</button>
+            </form>
+        </div>
+
+        {% elif vista == "login" %}
+        <div class="vendor-card" style="max-width: 450px; margin: 40px auto;">
+            <h2>AUTENTICACIÓN DE PROVEEDOR</h2>
+            <p class="subtitle">Establezca un túnel seguro con PostgreSQL y el catálogo central.</p>
+            <form action="/proveedor/login" method="POST" class="form-group" style="margin-top: 20px;">
+                <div>
+                    <label class="vendor-label">NOMBRE_ID</label>
+                    <input type="text" name="username" required class="vendor-input" placeholder="Usuario Proveedor">
+                </div>
+                <div>
+                    <label class="vendor-label">PASSWORD_KEY</label>
+                    <input type="password" name="password" required class="vendor-input" placeholder="Contraseña">
+                </div>
+                <button type="submit" class="btn-vendor btn-green" style="margin-top: 10px;">Validar Enlace Cuántico</button>
+            </form>
+        </div>
+
+        {% elif vista == "panel" %}
+        <div class="vendor-grid-layout">
+            <div class="vendor-card">
+                <h3><i class="fa-solid fa-microchip"></i> Inyectar Nuevo Componente</h3>
+                <form action="/catalog/add" method="POST" enctype="multipart/form-data" class="form-group">
+                    <div>
+                        <label class="vendor-label">Nombre del Dispositivo / SKU</label>
+                        <input type="text" name="name" required class="vendor-input" placeholder="Ej: Procesador Quantum Intel i9">
+                    </div>
+                    <div class="form-row">
+                        <div>
+                            <label class="vendor-label">Precio Base ($)</label>
+                            <input type="number" step="0.01" name="price" required class="vendor-input" placeholder="0.00">
+                        </div>
+                        <div>
+                            <label class="vendor-label">Unidades en Stock</label>
+                            <input type="number" name="stock" required class="vendor-input" placeholder="10">
+                        </div>
+                    </div>
+                    <div style="margin-bottom: 12px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                            <label class="vendor-label">Descripción Técnica del Producto</label>
+                            <span id="char-counter" class="char-counter-badge" style="font-family: var(--font-mono); font-size: 11px; color: var(--accent-vendor-cyan); background: rgba(0, 240, 255, 0.1); padding: 2px 6px; border-radius: 4px; border: 1px solid var(--border-vendor);">0 / 250</span>
+                        </div>
+                        <textarea id="vendor-description" name="description" class="vendor-input" maxlength="250" required style="height: 60px; resize: none;" placeholder="Escribe las especificaciones técnicas (Máximo 250 caracteres)..."></textarea>
+                    </div>
+                                        
+                    <div style="background: rgba(3, 4, 9, 0.4); padding: 12px; border-radius: 4px; border: 1px solid var(--border-vendor); margin: 8px 0;">
+                        <label class="vendor-label" style="display: flex; align-items: center; gap: 8px; cursor: pointer; text-transform: none; color: #ffffff;">
+                            <input type="checkbox" name="is_offer" id="chk_oferta" onchange="toggleFormularioOfertas()" style="cursor: pointer;">
+                            🔥 ¿Habilitar Evento de Oferta para este producto?
+                        </label>
+                        <div id="wrapper_precio_oferta" style="display: none; margin-top: 10px;">
+                            <label class="vendor-label" style="color: var(--accent-vendor-magenta);">Precio de Oferta Rebajado ($)</label>
+                            <input type="number" step="0.01" name="offer_price" id="offer_price_field" class="vendor-input" style="border-color: var(--accent-vendor-magenta);" placeholder="0.00">
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <label class="vendor-label"><i class="fa-solid fa-images"></i> Archivos Multimedia (Máx 7)</label>
+                        <input type="file" name="img_archivos" id="img_archivos" class="vendor-input" multiple onchange="validarLimiteImagenes(this)">
+                        <p id="msg_multimedia_preview" style="font-size: 10px; color: var(--text-vendor-secondary); margin-top: 4px; font-family: var(--font-mono);"></p>
+                    </div>
+                    
+                    <button type="submit" class="btn-vendor btn-green" style="margin-top: 8px;"><i class="fa-solid fa-cloud-arrow-up"></i> Propagar Componente</button>
+                </form>
+            </div>
+
+            <div class="vendor-card">
+                <h3><i class="fa-solid fa-boxes-stacked"></i> Almacén Sincronizados </h3>
+                <div class="table-container">
+                    <table class="vendor-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 10%;">ID_SKU</th>
+                                <th style="width: 35%;">DISPOSITIVO / CANAL</th>
+                                <th style="width: 20%;">MATRIZ VALOR</th>
+                                <th style="width: 15%;">DISPONIBLE</th>
+                                <th style="width: 20%; text-align: center;">ACCIONES</th>
+                            </tr>
+                        </thead>
+                        <tbody id="live-inventory-table">
+                            {% if productos %}
+                                {% for prod in productos %}
+                                <tr>
+                                    <td style="color: var(--accent-vendor-green); font-weight: bold; font-family: var(--font-mono);">#{{ prod.id }}</td>
+                                    <td style="color: #ffffff; font-weight: 600;">
+                                        {{ prod.name }}
+                                        {% if prod.is_offer %}
+                                            <span style="background: #451a03; color: #eab308; border: 1px solid #eab308; font-size: 10px; padding: 2px 6px; border-radius: 4px; font-weight: bold; margin-left: 8px; font-family: var(--font-mono);">🏷️ PROMO</span>
+                                        {% endif %}
+                                    </td>
+                                    <td style="color: #d1d5db;">
+                                        {% if prod.is_offer %}
+                                            <span style="color: #64748b; text-decoration: line-through; font-size: 11px; font-family: var(--font-mono);">$ {{ prod.price }}</span> 
+                                            <span style="color: var(--neon-amber); font-weight: bold; font-family: var(--font-mono);">$ {{ prod.offer_price }}</span>
+                                        {% else %}
+                                            <span style="color: #ffffff; font-family: var(--font-mono);">$ {{ prod.price }}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <span class="badge-vendor {% if prod.stock|int > 0 %}badge-in-stock{% else %}badge-out-stock{% endif %}">
+                                            {{ prod.stock }} unidades
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <div style="display: flex; gap: 8px; justify-content: center; align-items: center;">
+                                            <form action="/catalog/restock/{{ prod.id }}" method="POST" style="display: flex; gap: 4px; align-items: center;">
+                                                <input type="number" name="quantity" min="1" value="10" required class="input-restock-mini">
+                                                <button type="submit" class="btn-inline-action btn-inline-add">Reabastecer</button>
+                                            </form>
+                                            <form action="/catalog/delete/{{ prod.id }}" method="POST" onsubmit="return confirm('⚠️ ¿Está seguro de eliminar físicamente este SKU de la base de datos distribuida?');">
+                                                <button type="submit" class="btn-inline-action btn-inline-delete" title="Eliminar del catálogo">Purgar</button>
+                                            </form>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            {% else %}
+                                <tr>
+                                    <td colspan="5" style="padding: 48px; text-align: center; color: var(--text-vendor-muted); font-style: italic;">
+                                        <i class="fa-solid fa-box-open" style="font-size: 30px; display: block; margin-bottom: 8px; color: #4b5563;"></i>
+                                        Ningún elemento mapeado en la base de datos corporativa.
+                                    </td>
+                                </tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </main>
+    <div id="vendor-toast-container" style="position: fixed; bottom: 16px; right: 16px; z-index: 50; display: flex; flex-direction: column; gap: 8px; pointer-events: none;"></div>
+
+    <footer class="main-footer">
+        E-Commerce Corporate System &copy; 2026 - Central Logística Aislada en Red Multi-red `data-isolated`.
+    </footer>
+
+    <script>
+        function showVendorToast(message, isSuccess = true) {
+            const container = document.getElementById('vendor-toast-container');
+            const toast = document.createElement('div');
+            toast.className = 'toast-vendor';
+            if (!isSuccess) {
+                toast.style.backgroundColor = '#450a0a';
+                toast.style.border = '1px solid rgba(255, 0, 85, 0.3)';
+                toast.style.color = '#fca5a5';
+            }
+            toast.style.opacity = '0';
+            toast.style.transform = 'translateY(8px)';
+            const icon = isSuccess ? '<i class="fa-solid fa-circle-check" style="color: var(--accent-vendor-green);"></i>' : '<i class="fa-solid fa-circle-exclamation" style="color: var(--accent-vendor-magenta);"></i>';
+            toast.innerHTML = `${icon} <span>${message}</span>`;
+            container.appendChild(toast);
+            
+            setTimeout(() => { toast.style.opacity = '1'; toast.style.transform = 'translateY(0)'; }, 50);
+            setTimeout(() => {
+                toast.style.opacity = '0'; toast.style.transform = 'translateY(8px)';
+                setTimeout(() => toast.remove(), 300);
+            }, 4000);
+        }
+
+        function toggleFormularioOfertas() {
+            const checkbox = document.getElementById('chk_oferta');
+            const wrapper = document.getElementById('wrapper_precio_oferta');
+            const inputPrecio = document.getElementById('offer_price_field');
+            if (checkbox.checked) {
+                wrapper.style.display = 'block';
+                inputPrecio.required = true;
+            } else {
+                wrapper.style.display = 'none';
+                inputPrecio.required = false;
+                inputPrecio.value = '';
+            }
+        }
+
+        function validarLimiteImagenes(input) {
+            const msg = document.getElementById('msg_multimedia_preview');
+            if (input.files.length > 7) {
+                alert("⚠️ Exceso detectado: Máximo 7 imágenes simultáneas.");
+                input.value = ""; 
+                msg.innerText = "* ERROR: Límite excedido.";
+            } else {
+                msg.innerText = `* Listo: ${input.files.length} binarios encolados.`;
+            }
+        }
+
+        async function refreshInventoryTable() {
+            const tbody = document.getElementById('live-inventory-table');
+            if (!tbody) return; 
+            try {
+                const response = await fetch('/api/products/live');
+                if (!response.ok) return;
+                const productos = await response.json();
+                if (productos.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="5" style="padding:48px; text-align:center; color:var(--text-vendor-muted); font-style:italic;"><i class="fa-solid fa-box-open" style="font-size:30px; display:block; margin-bottom:8px; color:#4b5563;"></i>Ningún elemento mapeado en la base de datos corporativa.</td></tr>`;
+                    return;
+                }
+                let html = '';
+                productos.forEach(prod => {
+                    const badgeClass = parseInt(prod.stock) > 0 ? 'badge-in-stock' : 'badge-out-stock';
+                    const esOferta = String(prod.is_offer).toLowerCase() === 'true' || prod.is_offer === true;
+                    let catalogBadge = '';
+                    let priceDisplay = `<span style="color: #ffffff; font-family: var(--font-mono);">$ ${parseFloat(prod.price).toFixed(2)}</span>`;
+                    
+                    const descLimpia = prod.description ? prod.description : "Sin descripción técnica asignada.";
+
+                    if (esOferta) {
+                        const precioPromo = prod.offer_price ? parseFloat(prod.offer_price).toFixed(2) : "0.00";
+                        catalogBadge = `<span style="background: #451a03; color: var(--neon-amber); border: 1px solid var(--neon-amber); font-size: 10px; padding: 2px 6px; border-radius: 4px; font-weight: bold; margin-left: 8px; font-family: var(--font-mono);">🏷️ PROMO</span>`;
+                        priceDisplay = `<span style="color: #64748b; text-decoration: line-through; font-size: 11px; font-family: var(--font-mono);">$ ${parseFloat(prod.price).toFixed(2)}</span> <span style="color: var(--neon-amber); font-weight: bold; font-family: var(--font-mono);">$ ${precioPromo}</span>`;
+                    }
+                    html += `
+                    <tr>
+                        <td style="color: var(--accent-vendor-green); font-weight: bold; font-family: var(--font-mono);">#${prod.id}</td>
+                        <td style="color: #ffffff; font-weight: 600;">
+                            ${prod.name} ${catalogBadge}
+                            <!-- Contenedor controlado para la descripción en la celda -->
+                            <div style="font-size: 11px; font-weight: 400; color: var(--text-vendor-secondary); margin-top: 4px; max-width: 220px; word-wrap: break-word; font-style: italic; white-space: normal; line-height: 1.4;">
+                                ${descLimpia}
+                            </div>
+                        </td>
+                        <td>${priceDisplay}</td>
+                        <td><span class="badge-vendor ${badgeClass}">${prod.stock} unidades</span></td>
+                        <td>
+                            <div style="display: flex; gap: 8px; justify-content: center; align-items: center;">
+                                <form action="/catalog/restock/${prod.id}" method="POST" style="display: flex; gap: 4px; align-items: center;">
+                                    <input type="number" name="quantity" min="1" value="10" required class="input-restock-mini">
+                                    <button type="submit" class="btn-inline-action btn-inline-add">Reabastecer</button>
+                                </form>
+                                <form action="/catalog/delete/${prod.id}" method="POST" onsubmit="return confirm('⚠️ ¿Está seguro de eliminar físicamente este SKU de la base de datos distribuida?');">
+                                    <button type="submit" class="btn-inline-action btn-inline-delete">Purgar</button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>`;
+                });
+                tbody.innerHTML = html;
+            } catch (e) {
+                console.error("[BFF POLLING FAILURE] Desconexión en el bus de catálogo proveedor:", e);
+            }
+        }
+
+        document.addEventListener("DOMContentLoaded", () => {
+            const txtArea = document.getElementById('vendor-description');
+            const counterBadge = document.getElementById('char-counter');
+            if (txtArea && counterBadge) {
+                const maxChars = txtArea.getAttribute('maxlength') || 250;
+                txtArea.addEventListener('input', () => {
+                    const currentLength = txtArea.value.length;
+                    counterBadge.textContent = `${currentLength} / ${maxChars}`;
+                    
+                    if (currentLength >= maxChars - 20) {
+                        counterBadge.style.color = "var(--accent-vendor-magenta, #ff0055)";
+                        counterBadge.style.borderColor = "var(--accent-vendor-magenta, #ff0055)";
+                        counterBadge.style.backgroundColor = "rgba(255, 0, 85, 0.15)";
+                    } else {
+                        counterBadge.style.color = "var(--accent-vendor-cyan, #00f0ff)";
+                        counterBadge.style.borderColor = "var(--border-vendor, rgba(0, 240, 255, 0.15))";
+                        counterBadge.style.backgroundColor = "rgba(0, 240, 255, 0.1)";
+                    }
+                });
+            }
+
+            if (document.getElementById('live-inventory-table')) {
+                setInterval(refreshInventoryTable, 3000);
+            }
+
+            const logElement = document.getElementById('console-log-text');
+            if(logElement) {
+                const text = logElement.innerText.trim();
+                if(text && !text.includes("[SISTEMA]")) {
+                    if(text.includes("[SUCCESS]")) {
+                        showVendorToast(text.replace("[SUCCESS]", "🚀"), true);
+                    } else if(text.includes("[ERROR]")) {
+                        showVendorToast(text.replace("[ERROR]", "❌"), false);
+                    }
+                }
+            }
+
+            if (window.history.replaceState && window.location.search) {
+                const cleanUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
+                window.history.replaceState({path: cleanUrl}, '', cleanUrl);
+            }
+        });
+    </script>
+</body>
+</html>
