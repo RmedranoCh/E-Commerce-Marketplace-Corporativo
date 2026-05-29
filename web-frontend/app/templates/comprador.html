@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TechMarket — Plataforma de Aprovisionamiento Centralizado</title>
+    <link rel="preconnect" href="https://googleapis.com">
+    <link rel="preconnect" href="https://gstatic.com" crossorigin>
+    <link href="https://googleapis.com" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/base.css">
+    <link rel="stylesheet" href="/static/css/comprador.css">
+</head>
+<body class="buyer-body">
+    {% if logs %}
+    <div class="system-logs">
+        <span>⚙️ CORE-GATEWAY // {{ logs }}</span>
+        <span style="opacity: 0.6; font-size: 11px;">RED: BACKEND-MESH</span>
+    </div>
+    {% endif %}
+
+    <nav class="buyer-nav">
+        <div class="nav-wrapper">
+            <a href="/comprador" class="brand">TECH<span>MARKET</span></a>
+            <div class="nav-actions">
+                {% if vista == "dashboard" %}
+                    <span class="brand-badge">NOMBRE CLIENTE: {{ session.username }}</span>
+                    <button onclick="toggleCartDrawer(true)" class="btn-cart-trigger" aria-label="Abrir Carrito">
+                        🛒 Módulo de Pago
+                        <span class="cart-badge" id="cart-counter">0</span>
+                    </button>
+                    <a href="/comprador/logout" class="btn-logout">Cerrar Sesion</a>
+                {% else %}
+                    <span class="brand-badge">CONEXIÓN PÚBLICA</span>
+                {% endif %}
+            </div>
+        </div>
+    </nav>
+
+    <main class="container">
+        {% if vista == "auth_requerida" %}
+        <div class="split-sections">
+            <div class="buyer-section-card">
+                <h2>Identificación de Usuario</h2>
+                <p class="info-description">Establezca una sesión segura con la infraestructura central del Marketplace.</p>
+                <form action="/comprador/login" method="POST" class="form-group">
+                    <div>
+                        <label class="vendor-label">Nombre de Usuario</label>
+                        <input type="text" name="username" class="input-control" required placeholder="ej. alpha_buyer">
+                    </div>
+                    <div>
+                        <label class="vendor-label">Contraseña</label>
+                        <input type="password" name="password" class="input-control" required placeholder="••••••••">
+                    </div>
+                    <button type="submit" class="btn btn-dark">Autenticar Entrada</button>
+                </form>
+            </div>
+
+            <div class="buyer-section-card">
+                <h2>Registro de Nueva Cuenta</h2>
+                <p class="info-description">Genere una firma autorizada en el microservicio centralizado <strong>auth-service</strong>.</p>
+                <form action="/comprador/register" method="POST" class="form-group">
+                    <div>
+                        <label class="vendor-label">Nombre de Usuario</label>
+                        <input type="text" name="username" class="input-control" required placeholder="ej. custom_buyer">
+                    </div>
+                    <div>
+                        <label class="vendor-label">Email</label>
+                        <input type="email" name="email" class="input-control" required placeholder="operaciones@empresa.com">
+                    </div>
+                    <div>
+                        <label class="vendor-label">Contraseña</label>
+                        <input type="password" name="password" class="input-control" required placeholder="••••••••">
+                    </div>
+                    <button type="submit" class="btn btn-primary">Registrarse</button>
+                </form>
+            </div>
+        </div>
+        {% elif vista == "dashboard" %}
+        <div style="margin-bottom: 2rem;">
+            <h1 class="info-title" style="color: var(--text-buyer-dark)">Tienda Tech Global</h1>
+            <p class="info-description" style="color: var(--text-buyer-dark)">Asignación y reserva de articulos concurrentes validados en tiempo real mediante transacciones ACID.</p>
+        </div>
+        
+        <div class="linear-sections-layout">
+            {% if productos_oferta and productos_oferta|length > 0 %}
+            <section class="buyer-section-card" style="border: 2px solid var(--danger); position: relative;">
+                <div style="border-bottom: 1px solid var(--border-buyer); padding-bottom: 12px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center;">
+                    <h2 style="color: var(--text-buyer-dark); font-size: 18px; font-weight: 800; margin:0;">⚡ Canales de Liquidación</h2>
+                    <span class="section-tag tag-red" style="background: #fef2f2; color: var(--danger); border: 1px solid #fca5a5; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 800; text-transform: uppercase;">Ofertas Flash</span>
+                </div>
+                <div class="products-mini-grid" id="container-ofertas">
+                    {% for prod in productos_oferta %}
+                    <div class="product-item-box" id="card-oferta-{{ prod.id }}" style="min-height: 340px; position: relative;">
+                        <div class="form-group" style="gap: 4px; position: relative;">
+                            <div class="image-placeholder">
+                                {% if prod.imagen_urls and prod.imagen_urls|length > 0 %}
+                                    <img src="{{ prod.imagen_urls | first }}" id="preview-img-oferta-{{ prod.id }}" alt="{{ prod.name }}">
+                                    {% if prod.imagen_urls|length > 1 %}
+                                        <button type="button" class="carousel-btn prev" data-id="{{ prod.id }}" data-grid="oferta" data-dir="-1" data-max="{{ prod.imagen_urls|length }}" data-images="{{ prod.imagen_urls | join(',') }}" onclick="manejadorClickCarruselLimpio(this)">&lt;</button>
+                                        <button type="button" class="carousel-btn next" data-id="{{ prod.id }}" data-grid="oferta" data-dir="1" data-max="{{ prod.imagen_urls|length }}" data-images="{{ prod.imagen_urls | join(',') }}" onclick="manejadorClickCarruselLimpio(this)">&gt;</button>
+                                    {% endif %}
+                                {% else %}
+                                    <span>📦</span>
+                                {% endif %}
+                            </div>
+                            <h3>{{ prod.name }}</h3>
+                            
+                            <p class="product-description-text" title="{{ prod.description }}">
+                                {{ prod.description if prod.description else 'Módulo tecnológico de alta gama.' }}
+                            </p>
+
+                            <div style="display: flex; flex-direction: column; gap: 2px; margin-bottom: 4px;">
+                                <p class="price-actual discounted" id="price-oferta-{{ prod.id }}">$ {{ prod.offer_price }}</p>
+                                <span class="price-old">Antes: $ {{ prod.price }}</span>
+                            </div>
+                            <p style="font-size: 11px; margin-top: 2px; font-weight: 600; color: #d97706;" id="stock-oferta-{{ prod.id }}">⚡ Quedan {{ prod.stock }} u.</p>
+                        </div>
+                        <div style="display: flex; gap: 6px; margin-top: auto; align-items: center; border-top: 1px solid var(--border-buyer); padding-top: 10px;">
+                            <input type="number" id="input-qty-oferta-{{ prod.id }}" value="1" min="1" max="{{ prod.stock }}" style="width: 48px; height: 30px; background: #ffffff; border: 1px solid var(--border-buyer); border-radius: 6px; text-align: center; color: var(--text-buyer-dark); font-weight: 600; font-size: 12px; outline: none;">
+                            <button type="button" class="btn-add-cart" id="btn-add-oferta-{{ prod.id }}" onclick="addToCartWithQty('{{ prod.id }}', '{{ prod.name }}', '{{ prod.offer_price }}', 'oferta')">Añadir</button>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </section>
+            {% endif %}
+
+            <section class="buyer-section-card">
+                <div style="border-bottom: 1px solid var(--border-buyer); padding-bottom: 12px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center;">
+                    <h2 style="color: var(--text-buyer-dark); font-size: 18px; font-weight: 700; margin:0;">Tienda de Regular</h2>
+                    <span class="brand-badge">Estandár</span>
+                </div>
+                <div class="products-mini-grid" id="container-regulares">
+                    {% if productos_regulares and productos_regulares|length > 0 %}
+                        {% for prod in productos_regulares %}
+                        <div class="product-item-box" id="card-combo-{{ prod.id }}" style="min-height: 340px;">
+                            <div class="form-group" style="gap: 4px; display: flex; flex-direction: column;">
+                                <div class="image-placeholder">
+                                    {% if prod.imagen_urls and prod.imagen_urls|length > 0 %}
+                                        <img src="{{ prod.imagen_urls | first }}" id="preview-img-combo-{{ prod.id }}" alt="{{ prod.name }}">
+                                        {% if prod.imagen_urls|length > 1 %}
+                                            <button type="button" class="carousel-btn prev" data-id="{{ prod.id }}" data-grid="combo" data-dir="-1" data-max="{{ prod.imagen_urls|length }}" data-images="{{ prod.imagen_urls | join(',') }}" onclick="manejadorClickCarruselLimpio(this)">&lt;</button>
+                                            <button type="button" class="carousel-btn next" data-id="{{ prod.id }}" data-grid="combo" data-dir="1" data-max="{{ prod.imagen_urls|length }}" data-images="{{ prod.imagen_urls | join(',') }}" onclick="manejadorClickCarruselLimpio(this)">&gt;</button>
+                                        {% endif %}
+                                    {% else %}
+                                        <span style="font-size: 1.5rem;">📦</span>
+                                    {% endif %}
+                                </div>
+                                <h3>{{ prod.name }}</h3>
+                                
+                                <p class="product-description-text" title="{{ prod.description }}">
+                                    {{ prod.description if prod.description else 'Módulo tecnológico estándar.' }}
+                                </p>
+
+                                <p class="price-actual" id="price-combo-{{ prod.id }}">$ {{ prod.price }}</p>
+                                <p style="font-size: 11px; margin-top: 2px; font-weight: 600; color: #16a34a;" id="stock-combo-{{ prod.id }}">⚡ Stock: {{ prod.stock }} u.</p>
+                            </div>
+                            <div style="display: flex; gap: 6px; margin-top: auto; align-items: center; border-top: 1px solid var(--border-buyer); padding-top: 10px;">
+                                <input type="number" id="input-qty-combo-{{ prod.id }}" value="1" min="1" max="{{ prod.stock }}" style="width: 48px; height: 30px; background: #ffffff; border: 1px solid var(--border-buyer); border-radius: 6px; text-align: center; color: var(--text-buyer-dark); font-weight: 600; font-size: 12px; outline: none;">
+                                <button type="button" class="btn-add-cart js-add-to-cart" id="btn-add-combo-{{ prod.id }}" data-id="{{ prod.id }}" data-name="{{ prod.name }}" data-price="{{ prod.price }}" data-type="combo" onclick="addToCartWithQty('{{ prod.id }}', '{{ prod.name }}', '{{ prod.price }}', 'combo')">Añadir</button>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <p style="grid-column: 1 / -1; padding: 24px; text-align: center; color: var(--text-buyer-muted); font-style: italic;">No hay productos regulares mapeados en el clúster.</p>
+                    {% endif %}
+                </div>
+            </section>
+        </div>
+        {% endif %}
+    </main>
+    <div id="bff-catalog-matrix" data-catalog="{{ productos_regulares|tojson|safe if productos_regulares else '[]' }}" style="display: none;"></div>
+    
+    <div id="cart-drawer" class="drawer-backdrop hidden">
+        <div class="drawer-content">
+            <div>
+                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-buyer); padding-bottom: 12px;">
+                    <h3 style="font-weight: 700; font-size: 1.1rem; color: var(--text-buyer-dark); margin: 0; display: flex; align-items: center; gap: 8px;">
+                        📦 Nodos en Cola de Checkout
+                    </h3>
+                    <button onclick="toggleCartDrawer(false)" style="background: none; border: none; color: var(--text-buyer-muted); font-size: 18px; cursor: pointer; transition: var(--transition);">✕</button>
+                </div>
+                <div id="cart-items-list" class="cart-scrollable-list">
+                    <p style="text-align: center; color: var(--text-buyer-muted); font-size: 0.85rem; padding: 32px 0;">No se detectan SKUs asignados al búfer de salida.</p>
+                </div>
+            </div>
+            <div style="border-top: 1px solid var(--border-buyer); padding-top: 16px; display: flex; flex-direction: column; gap: 12px;">
+                <div style="display: flex; justify-content: space-between; font-weight: bold; font-size: 0.95rem; color: var(--text-buyer-dark);">
+                    <span>Monto Total Consolidado:</span>
+                    <span id="cart-total-usd" style="font-size: 1.3rem; color: var(--tech-blue);">$ 0.00</span>
+                </div>
+                <button onclick="enviarCheckoutMultiplexado()" id="btn-checkout" class="btn-checkout-gradient" disabled>
+                    Confirmar Transacción y Confirmar Pago
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <footer class="main-footer">
+        TechMarket Marketplace &copy; 2026 — Arquitectura de Alta Concurrencia sobre Subredes Aisladas `data-isolated`.
+    </footer>
+    <script>
+        const catalogContainer = document.getElementById('bff-catalog-matrix');
+        let localCatalog = [];
+        if (catalogContainer) {
+            try {
+                localCatalog = JSON.parse(catalogContainer.getAttribute('data-catalog') || '[]');
+            } catch (e) {
+                console.error("[BFF DOM PARSE ERROR] Estructura de catálogo corrupta:", e);
+            }
+        }
+        const EXPIRACION_CARRITO_MS = 7 * 24 * 60 * 60 * 1000; 
+        const AVISO_CAPACIDAD_CRITICA_BYTES = 4 * 1024 * 1024;
+        
+        function auditarPesoLocalStorage() {
+            let totalBytes = 0;
+            for (let clave in localStorage) {
+                if (localStorage.hasOwnProperty(clave)) {
+                    totalBytes += (localStorage[clave].length + clave.length) * 2;
+                }
+            }
+            if (totalBytes > AVISO_CAPACIDAD_CRITICA_BYTES) {
+                console.warn(`[MEMORIA INFRAESTRUCTURA] Espacio crítico superado: ${(totalBytes / 1024 / 1024).toFixed(2)} MB en uso.`);
+            }
+            return totalBytes;
+        }
+        
+        function depurarCachéExpirada() {
+            const marcaTiempoActual = new Date().getTime();
+            const ultimaActualizacion = localStorage.getItem('alipy_cart_timestamp');
+            if (ultimaActualizacion && (marcaTiempoActual - parseInt(ultimaActualizacion) > EXPIRACION_CARRITO_MS)) {
+                console.log("[SISTEMA CACHÉ] El búfer intermedio ha expirado por inactividad prolongada. Purgando datos...");
+                localStorage.removeItem('alipy_multi_cart');
+                localStorage.removeItem('alipy_cart_timestamp');
+                return [];
+            }
+            try {
+                return JSON.parse(localStorage.getItem('alipy_multi_cart') || '[]');
+            } catch (err) {
+                console.error("[SISTEMA CACHÉ] Datos corruptos detectados en el JSON. Reseteando búfer.");
+                return [];
+            }
+        }
+        
+        let cart = depurarCachéExpirada();
+        let carouselIndexes = {};
+        
+        function persistirCarritoConMarcaTiempo() {
+            try {
+                localStorage.setItem('alipy_multi_cart', JSON.stringify(cart));
+                localStorage.setItem('alipy_cart_timestamp', new Date().getTime().toString());
+                auditarPesoLocalStorage();
+            } catch (error) {
+                alert("⚠️ Error de hardware: No se pudieron guardar los datos. La memoria intermedia del navegador está completamente llena.");
+                console.error("[LOCALSTORAGE CRITICAL FULL]", error);
+            }
+        }
+        
+        function toggleCartDrawer(open) {
+            const drawer = document.getElementById('cart-drawer');
+            if (drawer) drawer.classList.toggle('hidden', !open);
+        }
+        function addToCartWithQty(id, name, price, typeGrid) {
+            const productInCatalog = localCatalog.find(p => p.id === parseInt(id));
+            if (!productInCatalog) {
+                alert("⚠️ Error en red: El SKU solicitado no se encuentra indexado en el nodo local.");
+                return;
+            }
+            const qtyInput = document.getElementById(`input-qty-${typeGrid}-${id}`);
+            const cantidadAAnadir = qtyInput ? parseInt(qtyInput.value) : 1;
+            if (isNaN(cantidadAAnadir) || cantidadAAnadir <= 0) {
+                alert("⚠️ Operación inválida: Ingrese un flujo de unidades válido y entero.");
+                return;
+            }
+            const existingInCart = cart.find(x => x.product_id === id);
+            const currentQuantityInCart = existingInCart ? existingInCart.quantity : 0;
+            if ((currentQuantityInCart + cantidadAAnadir) > productInCatalog.stock) {
+                alert(`⚠️ Límite de Stock Superado: No puedes añadir ${cantidadAAnadir} unidades. En cola de checkout posees ${currentQuantityInCart} u. El stock real remanente es de ${productInCatalog.stock} u.`);
+                return;
+            }
+            if (existingInCart) {
+                existingInCart.quantity += cantidadAAnadir;
+            } else {
+                cart.push({ 
+                    product_id: id, 
+                    name: name, 
+                    price: parseFloat(price),
+                    quantity: cantidadAAnadir 
+                });
+            }
+            if(qtyInput) qtyInput.value = 1;
+            saveAndRender();
+            toggleCartDrawer(true);
+        }
+        
+        function removeIdx(productId) {
+            cart = cart.filter(item => item.product_id !== productId);
+            saveAndRender();
+        }
+        
+        function saveAndRender() {
+            persistirCarritoConMarcaTiempo(); 
+            const list = document.getElementById('cart-items-list');
+            const totalUSD = document.getElementById('cart-total-usd');
+            const counter = document.getElementById('cart-counter');
+            const btnCheckout = document.getElementById('btn-checkout');
+            let count = 0; 
+            let total = 0.0; 
+            if (list) list.innerHTML = '';
+            cart.forEach(item => {
+                count += item.quantity;
+                total += item.price * item.quantity;
+                if (list) {
+                    list.innerHTML += 
+                        '<div class="cart-item-row" style="display: flex; justify-content: space-between; align-items: center; background-color: var(--bg-buyer-input); padding: 12px 16px; border-radius: var(--radius-buyer-sm); border: 1px solid var(--border-buyer); font-size: 0.85rem; margin-bottom: 8px;">' +
+                            '<div style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 180px;">' +
+                                '<h4 style="font-weight: 600; color: var(--text-buyer-dark); margin: 0; text-overflow: ellipsis; overflow: hidden;">' + item.name + '</h4>' +
+                                '<p style="font-size: 11px; color: var(--text-buyer-muted); margin: 2px 0 0 0;">' + item.quantity + ' x $ ' + item.price.toFixed(2) + '</p>' +
+                            '</div>' +
+                            '<div style="display: flex; align-items: center; gap: 12px; font-weight: 700; color: var(--text-buyer-dark);">' +
+                                '<span>$ ' + (item.price * item.quantity).toFixed(2) + '</span>' +
+                                '<button onclick="removeIdx(\'' + item.product_id + '\')" style="background: none; border: none; color: var(--text-buyer-muted); cursor: pointer; font-size: 14px;">✕</button>' +
+                            '</div>' +
+                        '</div>';
+                }
+            });
+            if (counter) counter.innerText = count;
+            if (totalUSD) totalUSD.innerText = '$ ' + total.toFixed(2);
+            if (btnCheckout) btnCheckout.disabled = cart.length === 0;
+            if (cart.length === 0 && list) {
+                list.innerHTML = '<p style="text-align: center; color: var(--text-buyer-muted); font-size: 0.85rem; padding: 32px 0;">No se detectan SKUs asignados al búfer de salida.</p>';
+            }
+        }
+        
+        async function enviarCheckoutMultiplexado() {
+            if (cart.length === 0) return alert("Seleccione productos para procesar.");
+            const btn = document.getElementById('btn-checkout');
+            if (!btn) return;
+            btn.disabled = true; 
+            btn.innerText = "PROCESANDO PAGO CONCURRENTE...";
+            const payload = {
+                items: cart.map(x => ({ product_id: parseInt(x.product_id), quantity: x.quantity }))
+            };
+            try {
+                const response = await fetch('/comprador/checkout', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const resData = await response.json();
+                if (response.status === 201 || response.ok) {
+                    alert(`🎉 ¡Compra exitosa!\nPedido #${resData.id || resData.order_id || 'N/A'} registrado de forma atómica en PostgreSQL.`);
+                    cart = [];
+                    saveAndRender(); 
+                    toggleCartDrawer(false);
+                    window.location.reload();
+                } else {
+                    alert(`⚠️ Error en procesamiento: ${resData.error || 'Error de validación de inventario.'}`);
+                }
+            } catch (err) {
+                alert("❌ Fallo crítico en la malla de servicios de la pasarela.");
+            } finally {
+                btn.disabled = false; 
+                btn.innerText = "Confirmar Transacción y Confirmar Pago";
+            }
+        }
+        async function refreshBuyerCatalog() {
+            const contenedorOfertas = document.getElementById('container-ofertas');
+            const contenedorRegulares = document.getElementById('container-regulares');
+            try {
+                const response = await fetch('/api/products/live');
+                if (!response.ok) return;
+                const productos = await response.json();
+                localCatalog = productos; 
+                
+                if (contenedorRegulares) {
+                    const regulares = productos.filter(p => p.is_offer !== true && String(p.is_offer).toLowerCase() !== 'true');
+                    if (regulares.length === 0) {
+                        contenedorRegulares.innerHTML = '<p style="grid-column: 1 / -1; padding: 24px; text-align: center; color: var(--text-buyer-muted); font-style: italic;">No hay productos regulares mapeados en el clúster.</p>';
+                    } else {
+                        let htmlRegulares = '';
+                        regulares.forEach(prod => {
+                            let botonesCarousel = '';
+                            let primeraImagen = '📦';
+                            if (prod.imagen_urls && prod.imagen_urls.length > 0) {
+                                const imgActual = document.getElementById(`preview-img-combo-${prod.id}`);
+                                const srcActual = imgActual ? imgActual.src : prod.imagen_urls[0];
+                                primeraImagen = `<img src="${srcActual}" id="preview-img-combo-${prod.id}" alt="${prod.name}">`;
+                                if (prod.imagen_urls.length > 1) {
+                                    botonesCarousel = `
+                                        <button type="button" class="carousel-btn prev" data-id="${prod.id}" data-grid="combo" data-dir="-1" data-max="${prod.imagen_urls.length}" data-images="${prod.imagen_urls.join(',')}" onclick="manejadorClickCarruselLimpio(this)">&lt;</button>
+                                        <button type="button" class="carousel-btn next" data-id="${prod.id}" data-grid="combo" data-dir="1" data-max="${prod.imagen_urls.length}" data-images="${prod.imagen_urls.join(',')}" onclick="manejadorClickCarruselLimpio(this)">&gt;</button>
+                                    `;
+                                }
+                            }
+                            
+                            const descText = prod.description ? prod.description : 'Módulo tecnológico estándar.';
+
+                            htmlRegulares += `
+                                <div class="product-item-box" id="card-combo-${prod.id}" style="min-height: 340px;">
+                                    <div class="form-group" style="gap: 4px; display: flex; flex-direction: column;">
+                                        <div class="image-placeholder">${primeraImagen} ${botonesCarousel}</div>
+                                        <h3>${prod.name}</h3>
+                                        <p class="product-description-text" title="${descText}">${descText}</p>
+                                        <p class="price-actual" id="price-combo-${prod.id}" style="color: var(--tech-blue); font-size: 15px; font-weight: 800; margin: 0;">$ ${parseFloat(prod.price).toFixed(2)}</p>
+                                        <p style="font-size: 11px; margin-top: 2px; font-weight: 600; color: #16a34a;" id="stock-combo-${prod.id}">⚡ Stock: ${prod.stock} u.</p>
+                                    </div>
+                                    <div style="display: flex; gap: 6px; margin-top: auto; align-items: center; border-top: 1px solid var(--border-buyer); padding-top: 10px;">
+                                        <input type="number" id="input-qty-combo-${prod.id}" value="1" min="1" max="${prod.stock}" style="width: 48px; height: 30px; background: #ffffff; border: 1px solid var(--border-buyer); border-radius: 6px; text-align: center; color: var(--text-buyer-dark); font-weight: 600; font-size: 12px; outline: none;">
+                                        <button type="button" class="btn-add-cart js-add-to-cart" id="btn-add-combo-${prod.id}" onclick="addToCartWithQty('${prod.id}', '${prod.name}', '${prod.price}', 'combo')">Añadir</button>
+                                    </div>
+                                </div>`;
+                        });
+                        contenedorRegulares.innerHTML = htmlRegulares;
+                    }
+                }
+                if (contenedorOfertas) {
+                    const ofertas = productos.filter(p => p.is_offer === true || String(p.is_offer).toLowerCase() === 'true');
+                    let htmlOfertas = '';
+                    ofertas.forEach(prod => {
+                        const textoStock = parseInt(prod.stock) > 0 ? `⚡ Quedan ${prod.stock} u.` : '❌ Agotado';
+                        const colorStock = parseInt(prod.stock) > 0 ? '#d97706' : '#ef4444';
+                        const botonDeshabilitado = parseInt(prod.stock) <= 0 ? 'disabled' : '';
+                        const precioFinal = prod.offer_price ? prod.offer_price : prod.price;
+                        let botonesCarousel = '';
+                        let primeraImagen = '📦';
+
+                        if (prod.imagen_urls && prod.imagen_urls.length > 0) {
+                            const imgActual = document.getElementById(`preview-img-oferta-${prod.id}`);
+                            const srcActual = imgActual ? imgActual.src : prod.imagen_urls[0];
+                            primeraImagen = `<img src="${srcActual}" id="preview-img-oferta-${prod.id}" alt="${prod.name}" style="width: 100%; height: 100%; object-fit: contain; padding: 4px; display: block; background: transparent; position: relative; z-index: 10;">`;
+                            
+                            if (prod.imagen_urls.length > 1) {
+                                const listaStr = prod.imagen_urls.join(',');
+                                botonesCarousel = `
+                                    <button type="button" class="carousel-btn prev" data-id="${prod.id}" data-grid="oferta" data-dir="-1" data-max="${prod.imagen_urls.length}" data-images="${listaStr}" onclick="manejadorClickCarruselLimpio(this)">&lt;</button>
+                                    <button type="button" class="carousel-btn next" data-id="${prod.id}" data-grid="oferta" data-dir="1" data-max="${prod.imagen_urls.length}" data-images="${listaStr}" onclick="manejadorClickCarruselLimpio(this)">&gt;</button>
+                                `;
+                            }
+                        }
+
+                        const descTextOferta = prod.description ? prod.description : 'Módulo tecnológico de alta gama.';
+
+                        htmlOfertas += `
+                            <div class="product-item-box" id="card-oferta-${prod.id}" style="border: 1px solid #fca5a5; min-height: 340px;">
+                                <div class="form-group" style="gap: 4px; display: flex; flex-direction: column; position: relative;">
+                                    
+                                    <!-- CONTENEDOR REPARADO: La etiqueta flota de forma absoluta primero -->
+                                    <div class="image-placeholder">
+                                        <span class="discount-tag" style="position: absolute; top: 8px; right: 8px; z-index: 25; margin: 0;">OFERTA</span>
+                                        ${primeraImagen} 
+                                        ${botonesCarousel}
+                                    </div>
+                                    
+                                    <h3 style="color: var(--text-buyer-dark); font-size: 14px; font-weight: 700; margin: 0 0 4px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${prod.name}</h3>
+                                    <p class="product-description-text" title="${descTextOferta}">${descTextOferta}</p>
+                                    <div style="display: flex; flex-direction: column;">
+                                        <p class="price-actual discounted" id="price-oferta-${prod.id}" style="color: #b91c1c; font-size: 15px; font-weight: 800; margin: 0;">$ ${parseFloat(precioFinal).toFixed(2)}</p>
+                                        <span style="color: var(--text-buyer-muted); text-decoration: line-through; font-size: 11px; font-weight: 500;">Antes: $ ${parseFloat(prod.price).toFixed(2)}</span>
+                                    </div>
+                                    <p style="font-size: 11px; margin-top: 2px; font-weight: 600; color: ${colorStock};" id="stock-oferta-${prod.id}">${textoStock}</p>
+                                </div>
+                                <div style="display: flex; gap: 6px; margin-top: auto; align-items: center; border-top: 1px solid #fee2e2; padding-top: 10px;">
+                                    <input type="number" id="input-qty-oferta-${prod.id}" value="1" min="1" max="${prod.stock}" style="width: 48px; height: 30px; background: #ffffff; border: 1px solid #fca5a5; border-radius: 6px; text-align: center; color: var(--text-buyer-dark); font-weight: 600; font-size: 12px; outline: none;">
+                                    <button type="button" class="btn-add-cart" id="btn-add-oferta-${prod.id}" ${botonDeshabilitado} onclick="addToCartWithQty('${prod.id}', '${prod.name}', '${precioFinal}', 'oferta')">Añadir</button>
+                                </div>
+                            </div>`;
+                    });
+                    if(contenedorOfertas) contenedorOfertas.innerHTML = htmlOfertas;
+                }
+            } catch (err) {
+                console.log("[POLLING ERROR] Error de sincronización de inventario distribuido: ", err);
+            }
+        }
+        
+        function manejadorClickCarruselLimpio(btn) {
+            const id = btn.getAttribute('data-id');
+            const grid = btn.getAttribute('data-grid');
+            const dir = parseInt(btn.getAttribute('data-dir'));
+            const images = btn.getAttribute('data-images').split(',');
+            const imgElement = document.getElementById(`preview-img-${grid}-${id}`);
+            
+            if (!imgElement || images.length <= 1) return;
+
+            let currentSrc = imgElement.getAttribute('src');
+            let idx = images.indexOf(currentSrc);
+            if (idx === -1) idx = 0;
+
+            let newIdx = idx + dir;
+            if (newIdx >= images.length) newIdx = 0;
+            if (newIdx < 0) newIdx = images.length - 1;
+
+            imgElement.setAttribute('src', images[newIdx]);
+        }
+
+        document.addEventListener("DOMContentLoaded", () => {
+            const drawerBackdrop = document.getElementById('cart-drawer');
+            if (drawerBackdrop) {
+                drawerBackdrop.addEventListener('click', (event) => {
+                    if (event.target === drawerBackdrop) toggleCartDrawer(false);
+                });
+            }
+            saveAndRender();
+            refreshBuyerCatalog();
+            setInterval(refreshBuyerCatalog, 5000);
+        });
+    </script>
+</body>
+</html>

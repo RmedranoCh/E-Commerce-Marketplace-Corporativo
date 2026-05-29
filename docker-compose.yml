@@ -1,0 +1,179 @@
+version: '3.8'
+
+networks:
+  public-gateway:
+    driver: bridge
+  backend-mesh:
+    driver: bridge
+  data-isolated:
+    driver: bridge
+    internal: true
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: postgres_db
+    environment:
+      POSTGRES_DB: ecommerce_prod
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: super_secure_admin_root_password_2026
+      APP_DB_USER: corporate_admin_user
+      APP_DB_PASS: strong_secure_password_2026
+      APP_DB_NAME: ecommerce_prod
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./postgres-init:/docker-entrypoint-initdb.d:ro
+    networks:
+      - data-isolated
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d ecommerce_prod"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: redis_cache
+    networks:
+      - data-isolated
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: rabbitmq_broker
+    networks:
+      - data-isolated
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "check_running"]
+      interval: 8s
+      timeout: 5s
+      retries: 5
+
+  auth-service:
+    build:
+      context: ./auth-service
+      dockerfile: Dockerfile
+    container_name: auth-service
+    environment:
+      - SECRET_KEY=global-corporate-secret-key-2026
+      - DATABASE_URL=sqlite:////app/db_data/auth.db
+    volumes:
+      - auth_data:/app/db_data
+    networks:
+      - backend-mesh
+      - data-isolated
+
+  order-service:
+    build:
+      context: ./order-service
+      dockerfile: Dockerfile
+    container_name: order-service
+    user: "root"
+    command: sh -c "mkdir -p /app/media/products && chown -R 8888:8888 /app/media && chmod -R 755 /app/media && su -s /bin/sh appuser -c 'python manage.py makemigrations catalog orders && python manage.py migrate && gunicorn --bind 0.0.0.0:8000 --workers 4 --threads 2 core.wsgi:application'"
+    volumes:
+      - ./order-service/catalog/migrations:/app/catalog/migrations
+      - ./order-service/orders/migrations:/app/orders/migrations
+      - media_compartido:/app/media
+    environment:
+      - DJANGO_SECRET_KEY=django-secure-prod-key-2026
+      - JWT_SECRET_KEY=global-corporate-secret-key-2026
+      - DJANGO_DEBUG=False
+      - DB_NAME=ecommerce_prod
+      - DB_USER=corporate_admin_user
+      - DB_PASSWORD=strong_secure_password_2026
+      - DB_HOST=postgres
+      - REDIS_URL=redis://redis:6379/0
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      backend-mesh:
+        aliases:
+          - order-service
+          - order_service
+      data-isolated:
+
+  outbox-worker:
+    build:
+      context: ./order-service
+      dockerfile: Dockerfile
+    container_name: outbox_worker
+    command: python publisher.py
+    environment:
+      - DJANGO_SECRET_KEY=django-secure-prod-key-2026
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
+      - DB_NAME=ecommerce_prod
+      - DB_USER=corporate_admin_user
+      - DB_PASSWORD=strong_secure_password_2026
+      - DB_HOST=postgres
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - data-isolated
+
+  notification-service:
+    build:
+      context: ./notification-service
+      dockerfile: Dockerfile
+    container_name: notification_service
+    environment:
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - backend-mesh
+      - data-isolated
+
+  web-frontend:
+    build:
+      context: ./web-frontend
+      dockerfile: Dockerfile
+    container_name: web_frontend
+    environment:
+      - AUTH_SERVICE_URL=http://auth-service:5000
+      - ORDER_SERVICE_URL=http://order-service:8000
+      - SECRET_KEY=global-corporate-secret-key-2026
+      - FRONTEND_SECRET_KEY=prod-secret-key-2026
+    volumes:
+      - media_compartido:/app/media
+    depends_on:
+      - auth-service
+      - order-service
+    networks:
+      - public-gateway
+      - backend-mesh
+
+  gateway:
+    image: nginx:alpine
+    container_name: nginx_gateway
+    volumes:
+      - ./gateway/nginx.conf:/etc/nginx/nginx.conf:ro
+      - media_compartido:/app/media:ro 
+    ports:
+      - "80:80"
+    depends_on:
+      - web-frontend
+      - auth-service
+      - order-service
+    networks:
+      - public-gateway
+      - backend-mesh
+
+volumes:
+  pgdata:
+  auth_data:
+  media_compartido:
