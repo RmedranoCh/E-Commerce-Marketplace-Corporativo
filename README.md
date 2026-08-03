@@ -270,6 +270,25 @@ El sistema arrancará automáticamente todos los servicios en el orden correcto.
 
 ---
 
+## Cómo ejecutar los tests
+
+Cada microservicio incluye tests unitarios con **pytest** que validan sus flujos críticos (autenticación, validaciones de catálogo, rutas del BFF y notificaciones) **sin necesidad de Docker ni de servicios externos** (PostgreSQL, Redis o RabbitMQ): usan bases de datos SQLite temporales y simulan los servicios upstream.
+
+```bash
+# 1. Instala las dependencias de desarrollo (una sola vez)
+pip install -r requirements-dev.txt
+
+# 2. Ejecuta los tests de cada microservicio
+cd auth-service && python -m pytest tests -v
+cd order-service && python -m pytest tests -v
+cd web-frontend && python -m pytest tests -v
+cd notification-service && python -m pytest tests -v
+```
+
+> **Nota:** `requirements-dev.txt` fija las versiones mínimas compatibles con Python 3.13. Para reproducir el entorno de producción exacto se usan los `requirements.txt` de cada servicio (imágenes Docker).
+
+---
+
 ## Cómo funciona el flujo de una compra (paso a paso)
 
 1. Un comprador navega el catálogo, ve productos con sus precios y fotos, y los añade al carrito.
@@ -629,6 +648,25 @@ The system will automatically start all services in the correct order. PostgreSQ
 | http://localhost/proveedor | Provider panel (Cybercore) |
 | http://localhost/admin | Django order administration |
 | http://localhost:15672 | RabbitMQ console (user: guest / password: guest) |
+
+---
+
+## Running the Tests
+
+Each microservice includes unit tests with **pytest** covering its critical flows (authentication, catalog validation, BFF routes, and notifications) **without requiring Docker or external services** (PostgreSQL, Redis, or RabbitMQ): they use temporary SQLite databases and mock the upstream services.
+
+```bash
+# 1. Install development dependencies (once)
+pip install -r requirements-dev.txt
+
+# 2. Run the tests for each microservice
+cd auth-service && python -m pytest tests -v
+cd order-service && python -m pytest tests -v
+cd web-frontend && python -m pytest tests -v
+cd notification-service && python -m pytest tests -v
+```
+
+> **Note:** `requirements-dev.txt` pins minimum versions compatible with Python 3.13. To reproduce the exact production environment, use each service's `requirements.txt` (Docker images).
 
 ---
 

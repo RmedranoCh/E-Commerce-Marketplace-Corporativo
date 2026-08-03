@@ -1,0 +1,32 @@
+# Dependencias de desarrollo para ejecutar los tests de todos los microservicios
+# Instalación única: pip install -r requirements-dev.txt
+# Se usan versiones mínimas (compatibles con Python 3.13); las versiones exactas
+# de producción están en los requirements.txt de cada servicio (imágenes Docker).
+
+pytest>=8
+
+# auth-service (Flask + SQLite + JWT RS256)
+flask>=3.0
+flask-sqlalchemy>=3.1
+pyjwt==2.8.0  # misma versión que producción (acepta 'sub' entero)
+cryptography>=42
+werkzeug>=3
+
+# order-service (Django REST + validaciones)
+django>=5.0
+djangorestframework>=3.14
+django-cors-headers>=4.3
+pillow>=10
+redis>=5
+
+# web-frontend (FastAPI BFF + tests HTTP)
+# Mismas versiones que producción: Starlette 0.36 usa la firma antigua de
+# TemplateResponse y TestClient requiere httpx<0.28.
+fastapi==0.110.0
+jinja2>=3.1
+httpx==0.27.0
+python-multipart>=0.0.9
+uvicorn>=0.27
+
+# notification-service (consumidor RabbitMQ + Redis)
+pika>=1.3
