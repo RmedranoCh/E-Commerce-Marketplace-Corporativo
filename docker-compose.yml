@@ -14,19 +14,19 @@ services:
     image: postgres:15-alpine
     container_name: postgres_db
     environment:
-      POSTGRES_DB: ecommerce_prod
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: super_secure_admin_root_password_2026
-      APP_DB_USER: corporate_admin_user
-      APP_DB_PASS: strong_secure_password_2026
-      APP_DB_NAME: ecommerce_prod
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      APP_DB_USER: ${APP_DB_USER}
+      APP_DB_PASS: ${APP_DB_PASS}
+      APP_DB_NAME: ${APP_DB_NAME}
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./postgres-init:/docker-entrypoint-initdb.d:ro
     networks:
       - data-isolated
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d ecommerce_prod"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -45,6 +45,11 @@ services:
   rabbitmq:
     image: rabbitmq:3-management-alpine
     container_name: rabbitmq_broker
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS}
+    ports:
+      - "15672:15672"
     networks:
       - data-isolated
     healthcheck:
@@ -59,7 +64,7 @@ services:
       dockerfile: Dockerfile
     container_name: auth-service
     environment:
-      - SECRET_KEY=global-corporate-secret-key-2026
+      - SECRET_KEY=${AUTH_SECRET_KEY}
       - DATABASE_URL=sqlite:////app/db_data/auth.db
     volumes:
       - auth_data:/app/db_data
@@ -72,27 +77,29 @@ services:
       context: ./order-service
       dockerfile: Dockerfile
     container_name: order-service
-    user: "root"
-    command: sh -c "mkdir -p /app/media/products && chown -R 8888:8888 /app/media && chmod -R 755 /app/media && su -s /bin/sh appuser -c 'python manage.py makemigrations catalog orders && python manage.py migrate && gunicorn --bind 0.0.0.0:8000 --workers 4 --threads 2 core.wsgi:application'"
-    volumes:
-      - ./order-service/catalog/migrations:/app/catalog/migrations
-      - ./order-service/orders/migrations:/app/orders/migrations
-      - media_compartido:/app/media
+    command: sh -c "mkdir -p /app/media/products && python manage.py migrate --noinput && gunicorn --bind 0.0.0.0:8000 --workers 4 --threads 2 core.wsgi:application"
     environment:
-      - DJANGO_SECRET_KEY=django-secure-prod-key-2026
-      - JWT_SECRET_KEY=global-corporate-secret-key-2026
+      - DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY}
+      - JWT_SECRET_KEY=${AUTH_SECRET_KEY}
       - DJANGO_DEBUG=False
-      - DB_NAME=ecommerce_prod
-      - DB_USER=corporate_admin_user
-      - DB_PASSWORD=strong_secure_password_2026
+      - DB_NAME=${APP_DB_NAME}
+      - DB_USER=${APP_DB_USER}
+      - DB_PASSWORD=${APP_DB_PASS}
       - DB_HOST=postgres
       - REDIS_URL=redis://redis:6379/0
-      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
+      - RABBITMQ_URL=amqp://${RABBITMQ_DEFAULT_USER}:${RABBITMQ_DEFAULT_PASS}@rabbitmq:5672/
+      - JWT_PUBLIC_KEY_FILE=/app/db_data/public_key.pem
+      - DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1,order-service,web-frontend,gateway
+    volumes:
+      - media_compartido:/app/media
+      - auth_data:/app/db_data:ro
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
+      auth-service:
+        condition: service_started
     networks:
       backend-mesh:
         aliases:
@@ -105,13 +112,13 @@ services:
       context: ./order-service
       dockerfile: Dockerfile
     container_name: outbox_worker
-    command: python publisher.py
+    command: python orders/publisher.py
     environment:
-      - DJANGO_SECRET_KEY=django-secure-prod-key-2026
-      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
-      - DB_NAME=ecommerce_prod
-      - DB_USER=corporate_admin_user
-      - DB_PASSWORD=strong_secure_password_2026
+      - DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY}
+      - RABBITMQ_URL=amqp://${RABBITMQ_DEFAULT_USER}:${RABBITMQ_DEFAULT_PASS}@rabbitmq:5672/
+      - DB_NAME=${APP_DB_NAME}
+      - DB_USER=${APP_DB_USER}
+      - DB_PASSWORD=${APP_DB_PASS}
       - DB_HOST=postgres
     depends_on:
       postgres:
@@ -127,7 +134,7 @@ services:
       dockerfile: Dockerfile
     container_name: notification_service
     environment:
-      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
+      - RABBITMQ_URL=amqp://${RABBITMQ_DEFAULT_USER}:${RABBITMQ_DEFAULT_PASS}@rabbitmq:5672/
       - REDIS_URL=redis://redis:6379/0
     depends_on:
       redis:
@@ -146,10 +153,12 @@ services:
     environment:
       - AUTH_SERVICE_URL=http://auth-service:5000
       - ORDER_SERVICE_URL=http://order-service:8000
-      - SECRET_KEY=global-corporate-secret-key-2026
-      - FRONTEND_SECRET_KEY=prod-secret-key-2026
+      - SECRET_KEY=${AUTH_SECRET_KEY}
+      - FRONTEND_SECRET_KEY=${FRONTEND_SECRET_KEY}
+      - JWT_PUBLIC_KEY_FILE=/app/db_data/public_key.pem
     volumes:
       - media_compartido:/app/media
+      - auth_data:/app/db_data:ro
     depends_on:
       - auth-service
       - order-service
@@ -162,7 +171,7 @@ services:
     container_name: nginx_gateway
     volumes:
       - ./gateway/nginx.conf:/etc/nginx/nginx.conf:ro
-      - media_compartido:/app/media:ro 
+      - media_compartido:/app/media:ro
     ports:
       - "80:80"
     depends_on:

@@ -5,8 +5,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY ./app ./app
 COPY ./init_db.py ./init_db.py
 COPY ./wsgi.py ./wsgi.py
-COPY ./app/private_key.pem ./app/private_key.pem
-COPY ./app/public_key.pem ./app/public_key.pem
 ENV FLASK_ENV=production
 ENV PYTHONUNBUFFERED=1
 RUN mkdir -p /app/db_data && \

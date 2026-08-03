@@ -4,9 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>TechMarket — Plataforma de Aprovisionamiento Centralizado</title>
-    <link rel="preconnect" href="https://googleapis.com">
-    <link rel="preconnect" href="https://gstatic.com" crossorigin>
-    <link href="https://googleapis.com" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/static/css/base.css">
     <link rel="stylesheet" href="/static/css/comprador.css">
 </head>
@@ -117,7 +117,7 @@
                         </div>
                         <div style="display: flex; gap: 6px; margin-top: auto; align-items: center; border-top: 1px solid var(--border-buyer); padding-top: 10px;">
                             <input type="number" id="input-qty-oferta-{{ prod.id }}" value="1" min="1" max="{{ prod.stock }}" style="width: 48px; height: 30px; background: #ffffff; border: 1px solid var(--border-buyer); border-radius: 6px; text-align: center; color: var(--text-buyer-dark); font-weight: 600; font-size: 12px; outline: none;">
-                            <button type="button" class="btn-add-cart" id="btn-add-oferta-{{ prod.id }}" onclick="addToCartWithQty('{{ prod.id }}', '{{ prod.name }}', '{{ prod.offer_price }}', 'oferta')">Añadir</button>
+                            <button type="button" class="btn-add-cart" id="btn-add-oferta-{{ prod.id }}" onclick="addToCartWithQty({{ prod.id|tojson }}, {{ prod.name|tojson }}, {{ prod.offer_price|tojson }}, 'oferta')">Añadir</button>
                         </div>
                     </div>
                     {% endfor %}
@@ -157,7 +157,7 @@
                             </div>
                             <div style="display: flex; gap: 6px; margin-top: auto; align-items: center; border-top: 1px solid var(--border-buyer); padding-top: 10px;">
                                 <input type="number" id="input-qty-combo-{{ prod.id }}" value="1" min="1" max="{{ prod.stock }}" style="width: 48px; height: 30px; background: #ffffff; border: 1px solid var(--border-buyer); border-radius: 6px; text-align: center; color: var(--text-buyer-dark); font-weight: 600; font-size: 12px; outline: none;">
-                                <button type="button" class="btn-add-cart js-add-to-cart" id="btn-add-combo-{{ prod.id }}" data-id="{{ prod.id }}" data-name="{{ prod.name }}" data-price="{{ prod.price }}" data-type="combo" onclick="addToCartWithQty('{{ prod.id }}', '{{ prod.name }}', '{{ prod.price }}', 'combo')">Añadir</button>
+                                <button type="button" class="btn-add-cart js-add-to-cart" id="btn-add-combo-{{ prod.id }}" data-id="{{ prod.id }}" data-name="{{ prod.name }}" data-price="{{ prod.price }}" data-type="combo" onclick="addToCartWithQty({{ prod.id|tojson }}, {{ prod.name|tojson }}, {{ prod.price|tojson }}, 'combo')">Añadir</button>
                             </div>
                         </div>
                         {% endfor %}
@@ -211,6 +211,15 @@
         }
         const EXPIRACION_CARRITO_MS = 7 * 24 * 60 * 60 * 1000; 
         const AVISO_CAPACIDAD_CRITICA_BYTES = 4 * 1024 * 1024;
+
+        function escapeHtml(value) {
+            return String(value)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
         
         function auditarPesoLocalStorage() {
             let totalBytes = 0;
@@ -314,12 +323,12 @@
                     list.innerHTML += 
                         '<div class="cart-item-row" style="display: flex; justify-content: space-between; align-items: center; background-color: var(--bg-buyer-input); padding: 12px 16px; border-radius: var(--radius-buyer-sm); border: 1px solid var(--border-buyer); font-size: 0.85rem; margin-bottom: 8px;">' +
                             '<div style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 180px;">' +
-                                '<h4 style="font-weight: 600; color: var(--text-buyer-dark); margin: 0; text-overflow: ellipsis; overflow: hidden;">' + item.name + '</h4>' +
+                                '<h4 style="font-weight: 600; color: var(--text-buyer-dark); margin: 0; text-overflow: ellipsis; overflow: hidden;">' + escapeHtml(item.name) + '</h4>' +
                                 '<p style="font-size: 11px; color: var(--text-buyer-muted); margin: 2px 0 0 0;">' + item.quantity + ' x $ ' + item.price.toFixed(2) + '</p>' +
                             '</div>' +
                             '<div style="display: flex; align-items: center; gap: 12px; font-weight: 700; color: var(--text-buyer-dark);">' +
                                 '<span>$ ' + (item.price * item.quantity).toFixed(2) + '</span>' +
-                                '<button onclick="removeIdx(\'' + item.product_id + '\')" style="background: none; border: none; color: var(--text-buyer-muted); cursor: pointer; font-size: 14px;">✕</button>' +
+                                '<button onclick="removeIdx(\'' + escapeHtml(item.product_id) + '\')" style="background: none; border: none; color: var(--text-buyer-muted); cursor: pointer; font-size: 14px;">✕</button>' +
                             '</div>' +
                         '</div>';
                 }
@@ -382,32 +391,37 @@
                         regulares.forEach(prod => {
                             let botonesCarousel = '';
                             let primeraImagen = '📦';
+                            const nombreSeguro = escapeHtml(prod.name);
+                            const idSeguro = escapeHtml(prod.id);
+                            const precioSeguro = escapeHtml(prod.price);
+                            const urlsSeguras = (prod.imagen_urls || []).map(url => escapeHtml(url));
+                            const srcActualSeguro = urlsSeguras.length > 0 ? urlsSeguras[0] : '';
                             if (prod.imagen_urls && prod.imagen_urls.length > 0) {
                                 const imgActual = document.getElementById(`preview-img-combo-${prod.id}`);
                                 const srcActual = imgActual ? imgActual.src : prod.imagen_urls[0];
-                                primeraImagen = `<img src="${srcActual}" id="preview-img-combo-${prod.id}" alt="${prod.name}">`;
+                                primeraImagen = `<img src="${escapeHtml(srcActual)}" id="preview-img-combo-${idSeguro}" alt="${nombreSeguro}">`;
                                 if (prod.imagen_urls.length > 1) {
                                     botonesCarousel = `
-                                        <button type="button" class="carousel-btn prev" data-id="${prod.id}" data-grid="combo" data-dir="-1" data-max="${prod.imagen_urls.length}" data-images="${prod.imagen_urls.join(',')}" onclick="manejadorClickCarruselLimpio(this)">&lt;</button>
-                                        <button type="button" class="carousel-btn next" data-id="${prod.id}" data-grid="combo" data-dir="1" data-max="${prod.imagen_urls.length}" data-images="${prod.imagen_urls.join(',')}" onclick="manejadorClickCarruselLimpio(this)">&gt;</button>
+                                        <button type="button" class="carousel-btn prev" data-id="${idSeguro}" data-grid="combo" data-dir="-1" data-max="${prod.imagen_urls.length}" data-images="${urlsSeguras.join(',')}" onclick="manejadorClickCarruselLimpio(this)">&lt;</button>
+                                        <button type="button" class="carousel-btn next" data-id="${idSeguro}" data-grid="combo" data-dir="1" data-max="${prod.imagen_urls.length}" data-images="${urlsSeguras.join(',')}" onclick="manejadorClickCarruselLimpio(this)">&gt;</button>
                                     `;
                                 }
                             }
                             
-                            const descText = prod.description ? prod.description : 'Módulo tecnológico estándar.';
+                            const descText = escapeHtml(prod.description ? prod.description : 'Módulo tecnológico estándar.');
 
                             htmlRegulares += `
-                                <div class="product-item-box" id="card-combo-${prod.id}" style="min-height: 340px;">
+                                <div class="product-item-box" id="card-combo-${idSeguro}" style="min-height: 340px;">
                                     <div class="form-group" style="gap: 4px; display: flex; flex-direction: column;">
                                         <div class="image-placeholder">${primeraImagen} ${botonesCarousel}</div>
-                                        <h3>${prod.name}</h3>
+                                        <h3>${nombreSeguro}</h3>
                                         <p class="product-description-text" title="${descText}">${descText}</p>
-                                        <p class="price-actual" id="price-combo-${prod.id}" style="color: var(--tech-blue); font-size: 15px; font-weight: 800; margin: 0;">$ ${parseFloat(prod.price).toFixed(2)}</p>
-                                        <p style="font-size: 11px; margin-top: 2px; font-weight: 600; color: #16a34a;" id="stock-combo-${prod.id}">⚡ Stock: ${prod.stock} u.</p>
+                                        <p class="price-actual" id="price-combo-${idSeguro}" style="color: var(--tech-blue); font-size: 15px; font-weight: 800; margin: 0;">$ ${parseFloat(prod.price).toFixed(2)}</p>
+                                        <p style="font-size: 11px; margin-top: 2px; font-weight: 600; color: #16a34a;" id="stock-combo-${idSeguro}">⚡ Stock: ${escapeHtml(prod.stock)} u.</p>
                                     </div>
                                     <div style="display: flex; gap: 6px; margin-top: auto; align-items: center; border-top: 1px solid var(--border-buyer); padding-top: 10px;">
-                                        <input type="number" id="input-qty-combo-${prod.id}" value="1" min="1" max="${prod.stock}" style="width: 48px; height: 30px; background: #ffffff; border: 1px solid var(--border-buyer); border-radius: 6px; text-align: center; color: var(--text-buyer-dark); font-weight: 600; font-size: 12px; outline: none;">
-                                        <button type="button" class="btn-add-cart js-add-to-cart" id="btn-add-combo-${prod.id}" onclick="addToCartWithQty('${prod.id}', '${prod.name}', '${prod.price}', 'combo')">Añadir</button>
+                                        <input type="number" id="input-qty-combo-${idSeguro}" value="1" min="1" max="${escapeHtml(prod.stock)}" style="width: 48px; height: 30px; background: #ffffff; border: 1px solid var(--border-buyer); border-radius: 6px; text-align: center; color: var(--text-buyer-dark); font-weight: 600; font-size: 12px; outline: none;">
+                                        <button type="button" class="btn-add-cart js-add-to-cart" id="btn-add-combo-${idSeguro}" onclick="addToCartWithQty(${idSeguro}, ${nombreSeguro}, ${precioSeguro}, 'combo')">Añadir</button>
                                     </div>
                                 </div>`;
                         });
@@ -418,31 +432,35 @@
                     const ofertas = productos.filter(p => p.is_offer === true || String(p.is_offer).toLowerCase() === 'true');
                     let htmlOfertas = '';
                     ofertas.forEach(prod => {
-                        const textoStock = parseInt(prod.stock) > 0 ? `⚡ Quedan ${prod.stock} u.` : '❌ Agotado';
-                        const colorStock = parseInt(prod.stock) > 0 ? '#d97706' : '#ef4444';
-                        const botonDeshabilitado = parseInt(prod.stock) <= 0 ? 'disabled' : '';
+                        const stockNum = parseInt(prod.stock);
+                        const textoStock = stockNum > 0 ? `⚡ Quedan ${escapeHtml(prod.stock)} u.` : '❌ Agotado';
+                        const colorStock = stockNum > 0 ? '#d97706' : '#ef4444';
+                        const botonDeshabilitado = stockNum <= 0 ? 'disabled' : '';
                         const precioFinal = prod.offer_price ? prod.offer_price : prod.price;
                         let botonesCarousel = '';
                         let primeraImagen = '📦';
+                        const nombreSeguro = escapeHtml(prod.name);
+                        const idSeguro = escapeHtml(prod.id);
+                        const urlsSeguras = (prod.imagen_urls || []).map(url => escapeHtml(url));
 
                         if (prod.imagen_urls && prod.imagen_urls.length > 0) {
                             const imgActual = document.getElementById(`preview-img-oferta-${prod.id}`);
                             const srcActual = imgActual ? imgActual.src : prod.imagen_urls[0];
-                            primeraImagen = `<img src="${srcActual}" id="preview-img-oferta-${prod.id}" alt="${prod.name}" style="width: 100%; height: 100%; object-fit: contain; padding: 4px; display: block; background: transparent; position: relative; z-index: 10;">`;
+                            primeraImagen = `<img src="${escapeHtml(srcActual)}" id="preview-img-oferta-${idSeguro}" alt="${nombreSeguro}" style="width: 100%; height: 100%; object-fit: contain; padding: 4px; display: block; background: transparent; position: relative; z-index: 10;">`;
                             
                             if (prod.imagen_urls.length > 1) {
-                                const listaStr = prod.imagen_urls.join(',');
+                                const listaStr = urlsSeguras.join(',');
                                 botonesCarousel = `
-                                    <button type="button" class="carousel-btn prev" data-id="${prod.id}" data-grid="oferta" data-dir="-1" data-max="${prod.imagen_urls.length}" data-images="${listaStr}" onclick="manejadorClickCarruselLimpio(this)">&lt;</button>
-                                    <button type="button" class="carousel-btn next" data-id="${prod.id}" data-grid="oferta" data-dir="1" data-max="${prod.imagen_urls.length}" data-images="${listaStr}" onclick="manejadorClickCarruselLimpio(this)">&gt;</button>
+                                    <button type="button" class="carousel-btn prev" data-id="${idSeguro}" data-grid="oferta" data-dir="-1" data-max="${prod.imagen_urls.length}" data-images="${listaStr}" onclick="manejadorClickCarruselLimpio(this)">&lt;</button>
+                                    <button type="button" class="carousel-btn next" data-id="${idSeguro}" data-grid="oferta" data-dir="1" data-max="${prod.imagen_urls.length}" data-images="${listaStr}" onclick="manejadorClickCarruselLimpio(this)">&gt;</button>
                                 `;
                             }
                         }
 
-                        const descTextOferta = prod.description ? prod.description : 'Módulo tecnológico de alta gama.';
+                        const descTextOferta = escapeHtml(prod.description ? prod.description : 'Módulo tecnológico de alta gama.');
 
                         htmlOfertas += `
-                            <div class="product-item-box" id="card-oferta-${prod.id}" style="border: 1px solid #fca5a5; min-height: 340px;">
+                            <div class="product-item-box" id="card-oferta-${idSeguro}" style="border: 1px solid #fca5a5; min-height: 340px;">
                                 <div class="form-group" style="gap: 4px; display: flex; flex-direction: column; position: relative;">
                                     
                                     <!-- CONTENEDOR REPARADO: La etiqueta flota de forma absoluta primero -->
@@ -452,17 +470,17 @@
                                         ${botonesCarousel}
                                     </div>
                                     
-                                    <h3 style="color: var(--text-buyer-dark); font-size: 14px; font-weight: 700; margin: 0 0 4px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${prod.name}</h3>
+                                    <h3 style="color: var(--text-buyer-dark); font-size: 14px; font-weight: 700; margin: 0 0 4px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${nombreSeguro}</h3>
                                     <p class="product-description-text" title="${descTextOferta}">${descTextOferta}</p>
                                     <div style="display: flex; flex-direction: column;">
-                                        <p class="price-actual discounted" id="price-oferta-${prod.id}" style="color: #b91c1c; font-size: 15px; font-weight: 800; margin: 0;">$ ${parseFloat(precioFinal).toFixed(2)}</p>
+                                        <p class="price-actual discounted" id="price-oferta-${idSeguro}" style="color: #b91c1c; font-size: 15px; font-weight: 800; margin: 0;">$ ${parseFloat(precioFinal).toFixed(2)}</p>
                                         <span style="color: var(--text-buyer-muted); text-decoration: line-through; font-size: 11px; font-weight: 500;">Antes: $ ${parseFloat(prod.price).toFixed(2)}</span>
                                     </div>
-                                    <p style="font-size: 11px; margin-top: 2px; font-weight: 600; color: ${colorStock};" id="stock-oferta-${prod.id}">${textoStock}</p>
+                                    <p style="font-size: 11px; margin-top: 2px; font-weight: 600; color: ${colorStock};" id="stock-oferta-${idSeguro}">${textoStock}</p>
                                 </div>
                                 <div style="display: flex; gap: 6px; margin-top: auto; align-items: center; border-top: 1px solid #fee2e2; padding-top: 10px;">
-                                    <input type="number" id="input-qty-oferta-${prod.id}" value="1" min="1" max="${prod.stock}" style="width: 48px; height: 30px; background: #ffffff; border: 1px solid #fca5a5; border-radius: 6px; text-align: center; color: var(--text-buyer-dark); font-weight: 600; font-size: 12px; outline: none;">
-                                    <button type="button" class="btn-add-cart" id="btn-add-oferta-${prod.id}" ${botonDeshabilitado} onclick="addToCartWithQty('${prod.id}', '${prod.name}', '${precioFinal}', 'oferta')">Añadir</button>
+                                    <input type="number" id="input-qty-oferta-${idSeguro}" value="1" min="1" max="${escapeHtml(prod.stock)}" style="width: 48px; height: 30px; background: #ffffff; border: 1px solid #fca5a5; border-radius: 6px; text-align: center; color: var(--text-buyer-dark); font-weight: 600; font-size: 12px; outline: none;">
+                                    <button type="button" class="btn-add-cart" id="btn-add-oferta-${idSeguro}" ${botonDeshabilitado} onclick="addToCartWithQty(${idSeguro}, ${nombreSeguro}, ${escapeHtml(precioFinal)}, 'oferta')">Añadir</button>
                                 </div>
                             </div>`;
                     });

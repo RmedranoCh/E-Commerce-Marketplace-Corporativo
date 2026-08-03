@@ -6,8 +6,10 @@
     <title>CYBERCORE // Panel de Control del Proveedor</title>
     <link rel="stylesheet" href="/static/css/base.css">
     <link rel="stylesheet" href="/static/css/proveedor.css">
-    <link href="https://googleapis.com" rel="stylesheet">
-    <link rel="stylesheet" href="https://cloudflare.com">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=Orbitron:wght@500;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 </head>
 <body class="vendor-body">
 
@@ -191,6 +193,15 @@
     </footer>
 
     <script>
+        function escapeHtml(value) {
+            return String(value)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
         function showVendorToast(message, isSuccess = true) {
             const container = document.getElementById('vendor-toast-container');
             const toast = document.createElement('div');
@@ -202,8 +213,14 @@
             }
             toast.style.opacity = '0';
             toast.style.transform = 'translateY(8px)';
-            const icon = isSuccess ? '<i class="fa-solid fa-circle-check" style="color: var(--accent-vendor-green);"></i>' : '<i class="fa-solid fa-circle-exclamation" style="color: var(--accent-vendor-magenta);"></i>';
-            toast.innerHTML = `${icon} <span>${message}</span>`;
+            const icon = document.createElement('i');
+            icon.className = isSuccess ? 'fa-solid fa-circle-check' : 'fa-solid fa-circle-exclamation';
+            icon.style.color = isSuccess ? 'var(--accent-vendor-green)' : 'var(--accent-vendor-magenta)';
+            const span = document.createElement('span');
+            span.textContent = message;
+            toast.appendChild(icon);
+            toast.appendChild(document.createTextNode(' '));
+            toast.appendChild(span);
             container.appendChild(toast);
             
             setTimeout(() => { toast.style.opacity = '1'; toast.style.transform = 'translateY(0)'; }, 50);
@@ -256,7 +273,9 @@
                     let catalogBadge = '';
                     let priceDisplay = `<span style="color: #ffffff; font-family: var(--font-mono);">$ ${parseFloat(prod.price).toFixed(2)}</span>`;
                     
-                    const descLimpia = prod.description ? prod.description : "Sin descripción técnica asignada.";
+                    const nombreSeguro = escapeHtml(prod.name);
+                    const descLimpia = escapeHtml(prod.description ? prod.description : "Sin descripción técnica asignada.");
+                    const idSeguro = escapeHtml(prod.id);
 
                     if (esOferta) {
                         const precioPromo = prod.offer_price ? parseFloat(prod.offer_price).toFixed(2) : "0.00";
@@ -265,23 +284,23 @@
                     }
                     html += `
                     <tr>
-                        <td style="color: var(--accent-vendor-green); font-weight: bold; font-family: var(--font-mono);">#${prod.id}</td>
+                        <td style="color: var(--accent-vendor-green); font-weight: bold; font-family: var(--font-mono);">#${idSeguro}</td>
                         <td style="color: #ffffff; font-weight: 600;">
-                            ${prod.name} ${catalogBadge}
+                            ${nombreSeguro} ${catalogBadge}
                             <!-- Contenedor controlado para la descripción en la celda -->
                             <div style="font-size: 11px; font-weight: 400; color: var(--text-vendor-secondary); margin-top: 4px; max-width: 220px; word-wrap: break-word; font-style: italic; white-space: normal; line-height: 1.4;">
                                 ${descLimpia}
                             </div>
                         </td>
                         <td>${priceDisplay}</td>
-                        <td><span class="badge-vendor ${badgeClass}">${prod.stock} unidades</span></td>
+                        <td><span class="badge-vendor ${badgeClass}">${escapeHtml(prod.stock)} unidades</span></td>
                         <td>
                             <div style="display: flex; gap: 8px; justify-content: center; align-items: center;">
-                                <form action="/catalog/restock/${prod.id}" method="POST" style="display: flex; gap: 4px; align-items: center;">
+                                <form action="/catalog/restock/${idSeguro}" method="POST" style="display: flex; gap: 4px; align-items: center;">
                                     <input type="number" name="quantity" min="1" value="10" required class="input-restock-mini">
                                     <button type="submit" class="btn-inline-action btn-inline-add">Reabastecer</button>
                                 </form>
-                                <form action="/catalog/delete/${prod.id}" method="POST" onsubmit="return confirm('⚠️ ¿Está seguro de eliminar físicamente este SKU de la base de datos distribuida?');">
+                                <form action="/catalog/delete/${idSeguro}" method="POST" onsubmit="return confirm('⚠️ ¿Está seguro de eliminar físicamente este SKU de la base de datos distribuida?');">
                                     <button type="submit" class="btn-inline-action btn-inline-delete">Purgar</button>
                                 </form>
                             </div>

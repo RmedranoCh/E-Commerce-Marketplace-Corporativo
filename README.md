@@ -161,6 +161,7 @@ Un panel de control con estética **Cyberpunk / Dark Industrial**. Tipografías 
 | POST | `/api/orders/catalog/products/` | Proveedor | Crear producto (con fotos) |
 | GET | `/api/orders/catalog/products/{id}/` | No | Ver producto individual |
 | PUT/PATCH/DELETE | `/api/orders/catalog/products/{id}/` | Proveedor | Actualizar o eliminar producto |
+| POST | `/api/orders/catalog/products/{id}/restock/` | Proveedor | Reabastecer stock de un producto |
 | POST | `/api/orders/checkout/` | Comprador | Crear orden de compra |
 
 ### Rutas internas del notification-service
@@ -173,53 +174,69 @@ Un panel de control con estética **Cyberpunk / Dark Industrial**. Tipografías 
 
 ## Variables de entorno
 
+> **Importante:** Todos los valores sensibles se definen en el archivo `.env` (ignorado por Git). Este archivo no debe subirse nunca al repositorio; consulta `.env.example` para ver la lista completa de variables con su propósito.
+
+Las variables que debes definir en `.env` son:
+
+| Variable | Propósito |
+|----------|-----------|
+| `POSTGRES_DB` | Nombre de la base de datos principal de PostgreSQL |
+| `POSTGRES_USER` | Usuario administrador de PostgreSQL |
+| `POSTGRES_PASSWORD` | Contraseña del usuario administrador |
+| `APP_DB_USER` | Usuario de aplicación de la base de datos |
+| `APP_DB_PASS` | Contraseña del usuario de aplicación |
+| `APP_DB_NAME` | Base de datos usada por Django (order-service) |
+| `DJANGO_SECRET_KEY` | Clave secreta de Django (firma de sesiones y CSRF) |
+| `AUTH_SECRET_KEY` | Clave maestra compartida para el servicio de autenticación y la firma JWT |
+| `FRONTEND_SECRET_KEY` | Clave del BFF (web-frontend) |
+| `RABBITMQ_DEFAULT_USER` | Usuario de RabbitMQ |
+| `RABBITMQ_DEFAULT_PASS` | Contraseña de RabbitMQ |
+
 ### docker-compose.yml
 
-| Variable | Valor |
-|----------|-------|
-| `POSTGRES_DB` | ecommerce_prod |
-| `POSTGRES_USER` | postgres |
-| `POSTGRES_PASSWORD` | super_secure_admin_root_password_2026 |
-| `APP_DB_USER` | corporate_admin_user |
-| `APP_DB_PASS` | strong_secure_password_2026 |
-| `APP_DB_NAME` | ecommerce_prod |
+| Variable | Se resuelve desde `.env` |
+|----------|--------------------------|
+| `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD` | `${POSTGRES_DB}`, `${POSTGRES_USER}`, `${POSTGRES_PASSWORD}` |
+| `APP_DB_USER`, `APP_DB_PASS`, `APP_DB_NAME` | `${APP_DB_USER}`, `${APP_DB_PASS}`, `${APP_DB_NAME}` |
+| `RABBITMQ_DEFAULT_USER`, `RABBITMQ_DEFAULT_PASS` | `${RABBITMQ_DEFAULT_USER}`, `${RABBITMQ_DEFAULT_PASS}` |
 
 ### auth-service
 
-| Variable | Valor |
-|----------|-------|
-| `SECRET_KEY` | global-corporate-secret-key-2026 |
-| `DATABASE_URL` | sqlite:////app/db_data/auth.db |
+| Variable | Propósito |
+|----------|-----------|
+| `SECRET_KEY` | Firma de tokens JWT (RS256, clave privada RSA) |
+| `DATABASE_URL` | Ruta de la base de datos SQLite aislada |
 
 ### order-service y outbox-worker
 
-| Variable | Valor |
-|----------|-------|
-| `DJANGO_SECRET_KEY` | django-secure-prod-key-2026 |
-| `JWT_SECRET_KEY` | global-corporate-secret-key-2026 |
-| `DJANGO_DEBUG` | False |
-| `DB_NAME` | ecommerce_prod |
-| `DB_USER` | corporate_admin_user |
-| `DB_PASSWORD` | strong_secure_password_2026 |
-| `DB_HOST` | postgres |
-| `REDIS_URL` | redis://redis:6379/0 |
-| `RABBITMQ_URL` | amqp://guest:guest@rabbitmq:5672/ |
+| Variable | Propósito |
+|----------|-----------|
+| `DJANGO_SECRET_KEY` | Firma de sesiones y CSRF de Django |
+| `JWT_SECRET_KEY` | Comparte el par RSA para verificar tokens JWT |
+| `DJANGO_DEBUG` | Siempre `False` en producción |
+| `DB_NAME`, `DB_USER`, `DB_PASSWORD` | Conexión a PostgreSQL |
+| `DB_HOST` | Host de PostgreSQL (`postgres` en Docker) |
+| `REDIS_URL` | Conexión a Redis |
+| `RABBITMQ_URL` | Conexión a RabbitMQ |
+| `JWT_PUBLIC_KEY_FILE` | Ruta del archivo de clave pública RSA dentro del contenedor |
+| `DJANGO_ALLOWED_HOSTS` | Hosts permitidos por Django (localhost, servicios internos) |
 
 ### notification-service
 
-| Variable | Valor |
-|----------|-------|
-| `RABBITMQ_URL` | amqp://guest:guest@rabbitmq:5672/ |
-| `REDIS_URL` | redis://redis:6379/0 |
+| Variable | Propósito |
+|----------|-----------|
+| `RABBITMQ_URL` | Conexión a RabbitMQ |
+| `REDIS_URL` | Conexión a Redis (idempotencia de notificaciones) |
 
 ### web-frontend
 
-| Variable | Valor |
-|----------|-------|
-| `AUTH_SERVICE_URL` | http://auth-service:5000 |
-| `ORDER_SERVICE_URL` | http://order-service:8000 |
-| `SECRET_KEY` | global-corporate-secret-key-2026 |
-| `FRONTEND_SECRET_KEY` | prod-secret-key-2026 |
+| Variable | Propósito |
+|----------|-----------|
+| `AUTH_SERVICE_URL` | URL interna del auth-service |
+| `ORDER_SERVICE_URL` | URL interna del order-service |
+| `SECRET_KEY` | Comparte el par RSA para verificar tokens JWT |
+| `FRONTEND_SECRET_KEY` | Clave de firma del BFF |
+| `JWT_PUBLIC_KEY_FILE` | Ruta del archivo de clave pública RSA dentro del contenedor |
 
 ---
 
@@ -274,11 +291,15 @@ Todo este proceso ocurre en cuestión de segundos, y está diseñado para que ni
 │   ├── app/
 │   │   ├── models.py      # Modelo User (username, email, password, role)
 │   │   ├── routes.py      # Blueprint con endpoints de auth
-│   │   ├── auth.py        # Lógica JWT (RS256)
-│   │   ├── private_key.pem
-│   │   └── public_key.pem
+│   │   ├── config.py      # Configuración desde variables de entorno
+│   │   ├── key_manager.py # Generación/lectura del par RSA (RS256)
+│   │   ├── rate_limiter.py# Limitación de intentos de login (10/min)
+│   │   ├── utils/
+│   │   │   └── jwt_helper.py  # Emisión/verificación de JWT con RSA
+│   │   └── public_key.pem # Clave pública RSA (la privada vive en volumen)
 │   ├── Dockerfile
-│   └── requirements.txt
+│   ├── requirements.txt
+│   └── .dockerignore
 │
 ├── gateway/               # Proxy inverso Nginx
 │   └── nginx.conf
@@ -299,14 +320,14 @@ Todo este proceso ocurre en cuestión de segundos, y está diseñado para que ni
 │   │   └── authentication.py  # Autenticación JWT personalizada
 │   ├── catalog/
 │   │   ├── models.py      # Modelo Product
-│   │   ├── serializers.py # ProductSerializer
-│   │   ├── views.py       # CRUD de productos
+│   │   ├── serializers.py # ProductSerializer (validaciones)
+│   │   ├── views.py       # CRUD + restock de productos
 │   │   └── urls.py
 │   ├── orders/
 │   │   ├── models.py      # Order, OrderItem, OutboxEvent
 │   │   ├── views.py       # CreateOrderView
+│   │   ├── publisher.py   # Outbox worker (publica a RabbitMQ)
 │   │   └── urls.py
-│   ├── publisher.py       # Outbox worker
 │   ├── Dockerfile
 │   ├── requirements.txt
 │   └── public_key.pem     # Llave pública RSA para JWT
@@ -314,11 +335,10 @@ Todo este proceso ocurre en cuestión de segundos, y está diseñado para que ni
 ├── web-frontend/          # BFF (Backend for Frontend) - FastAPI
 │   ├── app/
 │   │   ├── main.py        # FastAPI app con rutas y templates
-│   │   ├── jwt_utils.py   # Validación de JWT
-│   │   ├── templates/     # Jinja2: index, comprador, proveedor
-│   │   └── static/
-│   │       ├── css/       # base.css, comprador.css, proveedor.css
-│   │       └── js/        # JavaScript (carrito, polling, etc.)
+│   │   ├── public_key.pem # Llave pública RSA para validar JWT
+│   │   └── templates/     # Jinja2: index, comprador, proveedor
+│   │       └── static/
+│   │           └── css/   # base.css, comprador.css, proveedor.css
 │   ├── Dockerfile
 │   └── requirements.txt
 │
@@ -326,6 +346,7 @@ Todo este proceso ocurre en cuestión de segundos, y está diseñado para que ni
 │   └── init-user-db.sh
 │
 ├── docker-compose.yml     # Orquestación completa del sistema
+├── .env.example           # Plantilla de variables de entorno (sin secretos)
 └── .gitignore
 ```
 
@@ -502,6 +523,7 @@ A control panel with a **Cyberpunk / Dark Industrial** aesthetic. Monospace font
 | POST | `/api/orders/catalog/products/` | Provider | Create product (with images) |
 | GET | `/api/orders/catalog/products/{id}/` | No | Get single product |
 | PUT/PATCH/DELETE | `/api/orders/catalog/products/{id}/` | Provider | Update or delete product |
+| POST | `/api/orders/catalog/products/{id}/restock/` | Provider | Restock a product |
 | POST | `/api/orders/checkout/` | Buyer | Create purchase order |
 
 ### notification-service Internal Route
@@ -514,53 +536,69 @@ A control panel with a **Cyberpunk / Dark Industrial** aesthetic. Monospace font
 
 ## Environment Variables
 
+> **Important:** All sensitive values are defined in the `.env` file (ignored by Git). This file must never be committed to the repository; see `.env.example` for the full list of variables and their purpose.
+
+Variables to define in `.env`:
+
+| Variable | Purpose |
+|----------|---------|
+| `POSTGRES_DB` | Main PostgreSQL database name |
+| `POSTGRES_USER` | PostgreSQL admin user |
+| `POSTGRES_PASSWORD` | Admin user password |
+| `APP_DB_USER` | Application database user |
+| `APP_DB_PASS` | Application user password |
+| `APP_DB_NAME` | Database used by Django (order-service) |
+| `DJANGO_SECRET_KEY` | Django secret key (sessions and CSRF signing) |
+| `AUTH_SECRET_KEY` | Master shared key for the auth service and JWT signing |
+| `FRONTEND_SECRET_KEY` | BFF (web-frontend) signing key |
+| `RABBITMQ_DEFAULT_USER` | RabbitMQ user |
+| `RABBITMQ_DEFAULT_PASS` | RabbitMQ password |
+
 ### docker-compose.yml
 
-| Variable | Value |
-|----------|-------|
-| `POSTGRES_DB` | ecommerce_prod |
-| `POSTGRES_USER` | postgres |
-| `POSTGRES_PASSWORD` | super_secure_admin_root_password_2026 |
-| `APP_DB_USER` | corporate_admin_user |
-| `APP_DB_PASS` | strong_secure_password_2026 |
-| `APP_DB_NAME` | ecommerce_prod |
+| Variable | Resolved from `.env` |
+|----------|----------------------|
+| `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD` | `${POSTGRES_DB}`, `${POSTGRES_USER}`, `${POSTGRES_PASSWORD}` |
+| `APP_DB_USER`, `APP_DB_PASS`, `APP_DB_NAME` | `${APP_DB_USER}`, `${APP_DB_PASS}`, `${APP_DB_NAME}` |
+| `RABBITMQ_DEFAULT_USER`, `RABBITMQ_DEFAULT_PASS` | `${RABBITMQ_DEFAULT_USER}`, `${RABBITMQ_DEFAULT_PASS}` |
 
 ### auth-service
 
-| Variable | Value |
-|----------|-------|
-| `SECRET_KEY` | global-corporate-secret-key-2026 |
-| `DATABASE_URL` | sqlite:////app/db_data/auth.db |
+| Variable | Purpose |
+|----------|---------|
+| `SECRET_KEY` | JWT signing (RS256, RSA private key) |
+| `DATABASE_URL` | Path to the isolated SQLite database |
 
 ### order-service and outbox-worker
 
-| Variable | Value |
-|----------|-------|
-| `DJANGO_SECRET_KEY` | django-secure-prod-key-2026 |
-| `JWT_SECRET_KEY` | global-corporate-secret-key-2026 |
-| `DJANGO_DEBUG` | False |
-| `DB_NAME` | ecommerce_prod |
-| `DB_USER` | corporate_admin_user |
-| `DB_PASSWORD` | strong_secure_password_2026 |
-| `DB_HOST` | postgres |
-| `REDIS_URL` | redis://redis:6379/0 |
-| `RABBITMQ_URL` | amqp://guest:guest@rabbitmq:5672/ |
+| Variable | Purpose |
+|----------|---------|
+| `DJANGO_SECRET_KEY` | Django session and CSRF signing |
+| `JWT_SECRET_KEY` | Shares the RSA key pair to verify JWT tokens |
+| `DJANGO_DEBUG` | Always `False` in production |
+| `DB_NAME`, `DB_USER`, `DB_PASSWORD` | PostgreSQL connection |
+| `DB_HOST` | PostgreSQL host (`postgres` in Docker) |
+| `REDIS_URL` | Redis connection |
+| `RABBITMQ_URL` | RabbitMQ connection |
+| `JWT_PUBLIC_KEY_FILE` | Path to the RSA public key file inside the container |
+| `DJANGO_ALLOWED_HOSTS` | Allowed hosts for Django (localhost, internal services) |
 
 ### notification-service
 
-| Variable | Value |
-|----------|-------|
-| `RABBITMQ_URL` | amqp://guest:guest@rabbitmq:5672/ |
-| `REDIS_URL` | redis://redis:6379/0 |
+| Variable | Purpose |
+|----------|---------|
+| `RABBITMQ_URL` | RabbitMQ connection |
+| `REDIS_URL` | Redis connection (notification idempotency) |
 
 ### web-frontend
 
-| Variable | Value |
-|----------|-------|
-| `AUTH_SERVICE_URL` | http://auth-service:5000 |
-| `ORDER_SERVICE_URL` | http://order-service:8000 |
-| `SECRET_KEY` | global-corporate-secret-key-2026 |
-| `FRONTEND_SECRET_KEY` | prod-secret-key-2026 |
+| Variable | Purpose |
+|----------|---------|
+| `AUTH_SERVICE_URL` | Internal auth-service URL |
+| `ORDER_SERVICE_URL` | Internal order-service URL |
+| `SECRET_KEY` | Shares the RSA key pair to verify JWT tokens |
+| `FRONTEND_SECRET_KEY` | BFF signing key |
+| `JWT_PUBLIC_KEY_FILE` | Path to the RSA public key file inside the container |
 
 ---
 
@@ -615,11 +653,15 @@ This whole process happens in seconds and is designed so that no order is ever l
 │   ├── app/
 │   │   ├── models.py      # User model (username, email, password, role)
 │   │   ├── routes.py      # Auth endpoint Blueprint
-│   │   ├── auth.py        # JWT logic (RS256)
-│   │   ├── private_key.pem
-│   │   └── public_key.pem
+│   │   ├── config.py      # Configuration from environment variables
+│   │   ├── key_manager.py # RSA key pair generation/loading (RS256)
+│   │   ├── rate_limiter.py# Login attempt throttling (10/min)
+│   │   ├── utils/
+│   │   │   └── jwt_helper.py  # JWT issuing/verification with RSA
+│   │   └── public_key.pem # RSA public key (private key lives in a volume)
 │   ├── Dockerfile
-│   └── requirements.txt
+│   ├── requirements.txt
+│   └── .dockerignore
 │
 ├── gateway/               # Nginx reverse proxy
 │   └── nginx.conf
@@ -640,14 +682,14 @@ This whole process happens in seconds and is designed so that no order is ever l
 │   │   └── authentication.py  # Custom JWT authentication
 │   ├── catalog/
 │   │   ├── models.py      # Product model
-│   │   ├── serializers.py # ProductSerializer
-│   │   ├── views.py       # Product CRUD
+│   │   ├── serializers.py # ProductSerializer (validations)
+│   │   ├── views.py       # Product CRUD + restock
 │   │   └── urls.py
 │   ├── orders/
 │   │   ├── models.py      # Order, OrderItem, OutboxEvent
 │   │   ├── views.py       # CreateOrderView
+│   │   ├── publisher.py   # Outbox worker (publishes to RabbitMQ)
 │   │   └── urls.py
-│   ├── publisher.py       # Outbox worker
 │   ├── Dockerfile
 │   ├── requirements.txt
 │   └── public_key.pem     # RSA public key for JWT
@@ -655,11 +697,10 @@ This whole process happens in seconds and is designed so that no order is ever l
 ├── web-frontend/          # BFF (Backend for Frontend) - FastAPI
 │   ├── app/
 │   │   ├── main.py        # FastAPI with routes and templates
-│   │   ├── jwt_utils.py   # JWT validation
-│   │   ├── templates/     # Jinja2: index, comprador, proveedor
-│   │   └── static/
-│   │       ├── css/       # base.css, comprador.css, proveedor.css
-│   │       └── js/        # JavaScript (cart, polling, etc.)
+│   │   ├── public_key.pem # RSA public key for JWT validation
+│   │   └── templates/     # Jinja2: index, comprador, proveedor
+│   │       └── static/
+│   │           └── css/   # base.css, comprador.css, proveedor.css
 │   ├── Dockerfile
 │   └── requirements.txt
 │
@@ -667,6 +708,7 @@ This whole process happens in seconds and is designed so that no order is ever l
 │   └── init-user-db.sh
 │
 ├── docker-compose.yml     # Full system orchestration
+├── .env.example           # Environment variable template (no secrets)
 └── .gitignore
 ```
 

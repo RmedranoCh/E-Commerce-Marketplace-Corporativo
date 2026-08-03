@@ -21,6 +21,11 @@ htmlcov/
 *.sqlite3
 data/
 
+# Claves privadas (NUNCA dentro de la imagen)
+**/private_key.pem
+**/*.key
+private_key.pem
+
 .git/
 .gitignore
 .gitattributes

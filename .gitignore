@@ -34,6 +34,12 @@ nginx_error.log
 .env.[a-zA-Z]*
 !.env.example
 
+# Claves privadas y certificados (NUNCA commitear)
+**/private_key.pem
+**/*.key
+*.pem
+!**/public_key.pem
+
 .vscode/
 .idea/
 *.suo

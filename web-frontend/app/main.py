@@ -23,14 +23,40 @@ app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="stat
 AUTH_SERVICE_URL = os.getenv("AUTH_SERVICE_URL", "http://auth-service:5000")
 ORDER_SERVICE_URL = os.getenv("ORDER_SERVICE_URL", "http://order-service:8000")
 
-with open(BASE_DIR / "public_key.pem", "r") as f:
-    PUBLIC_KEY = f.read()
+MAX_DESCRIPCION = 250
+MAX_IMAGENES = 7
+MAX_IMAGEN_BYTES = 5 * 1024 * 1024
+EXTENSIONES_PERMITIDAS = {".jpg", ".jpeg", ".png", ".gif", ".webp"}
+
+PUBLIC_KEY = None
+
+
+def get_public_key():
+    global PUBLIC_KEY
+    if PUBLIC_KEY:
+        return PUBLIC_KEY
+    candidates = [
+        os.getenv("JWT_PUBLIC_KEY_FILE", ""),
+        str(BASE_DIR / "public_key.pem"),
+    ]
+    for path in candidates:
+        if not path:
+            continue
+        try:
+            with open(path, "r") as f:
+                PUBLIC_KEY = f.read()
+                if PUBLIC_KEY:
+                    return PUBLIC_KEY
+        except OSError:
+            continue
+    return ""
+
 
 def extraer_datos_de_jwt(token: str):
     if not token:
         return {}
     try:
-        payload = jwt.decode(token, PUBLIC_KEY, algorithms=['RS256'])
+        payload = jwt.decode(token, get_public_key(), algorithms=['RS256'])
         return payload
     except Exception:
         return {}
@@ -70,7 +96,7 @@ async def proveedor_view(request: Request, msg: str = None):
                     productos = res_prod.json()
         except Exception as e:
             logger.error(f"[BFF] Error al recuperar catálogo para panel: {str(e)}")
-            
+
         return templates.TemplateResponse("proveedor.html", {
             "request": request, "vista": "panel", "productos": productos, "msg": mensaje_limpio, "username": datos.get("sub")
         })
@@ -84,26 +110,26 @@ async def proveedor_register(username: str = Form(...), email: str = Form(...), 
     try:
         async with httpx.AsyncClient() as client:
             res = await client.post(
-                f"{AUTH_SERVICE_URL}/api/auth/register", 
+                f"{AUTH_SERVICE_URL}/api/auth/register",
                 json={
-                    "username": username, 
-                    "email": email, 
-                    "password": password, 
+                    "username": username,
+                    "email": email,
+                    "password": password,
                     "role": "proveedor"
-                }, 
+                },
                 timeout=5.0
             )
-        
+
         if res.status_code == 201:
             log_msg = "[SUCCESS_AUTH] Proveedor maestro creado exitosamente. Inicie sesión ahora."
         else:
             error_detalle = res.json().get("error", "Campos duplicados o parámetros inválidos")
             log_msg = f"[ERROR_AUTH] {error_detalle}"
-            
+
     except Exception as e:
         logger.error(f"[BFF CRITICAL] Error de red hacia auth-service: {str(e)}")
         log_msg = "[ERROR_AUTH] El servicio de autenticación corporativo no responde en la red backend-mesh."
-        
+
     return RedirectResponse(url=f"/proveedor?msg={quote(log_msg)}", status_code=status.HTTP_303_SEE_OTHER)
 
 @app.post("/proveedor/login")
@@ -111,7 +137,7 @@ async def proveedor_login(username: str = Form(...), password: str = Form(...)):
     try:
         async with httpx.AsyncClient() as client:
             res = await client.post(
-                f"{AUTH_SERVICE_URL}/api/auth/login", 
+                f"{AUTH_SERVICE_URL}/api/auth/login",
                 json={"username": username, "password": password},
                 timeout=4.0
             )
@@ -141,25 +167,42 @@ async def proveedor_logout():
 
 @app.post("/catalog/add")
 async def add_product(
-    request: Request, 
-    name: str = Form(...), 
-    price: float = Form(...), 
+    request: Request,
+    name: str = Form(...),
+    price: float = Form(...),
     stock: int = Form(...),
     description: Optional[str] = Form(""),
     offer_price: Optional[float] = Form(None),
     is_offer: Optional[str] = Form("false"),
-    img_archivos: List[UploadFile] = File(None) 
+    img_archivos: List[UploadFile] = File(None)
 ):
     token = request.cookies.get("access_token_proveedor")
     datos = extraer_datos_de_jwt(token) if token else {}
     if datos.get("role") != "proveedor":
         return RedirectResponse(url=f"/proveedor?msg={quote('[DENEGADO] Acción restringida.')}", status_code=status.HTTP_303_SEE_OTHER)
     try:
+        nombre_limpio = str(name).strip()
+        if not nombre_limpio:
+            return RedirectResponse(url=f"/proveedor?msg={quote('[ERROR] El nombre del producto es obligatorio.')}", status_code=status.HTTP_303_SEE_OTHER)
+        if len(nombre_limpio) > 255:
+            return RedirectResponse(url=f"/proveedor?msg={quote('[ERROR] El nombre no puede superar 255 caracteres.')}", status_code=status.HTTP_303_SEE_OTHER)
+        if price <= 0:
+            return RedirectResponse(url=f"/proveedor?msg={quote('[ERROR] El precio debe ser mayor que cero.')}", status_code=status.HTTP_303_SEE_OTHER)
+        if stock < 0:
+            return RedirectResponse(url=f"/proveedor?msg={quote('[ERROR] El stock no puede ser negativo.')}", status_code=status.HTTP_303_SEE_OTHER)
+        if len(description or "") > MAX_DESCRIPCION:
+            return RedirectResponse(url=f"/proveedor?msg={quote(f'[ERROR] La descripción no puede superar los {MAX_DESCRIPCION} caracteres.')}", status_code=status.HTTP_303_SEE_OTHER)
+
         es_oferta_bool = "true" if is_offer in ["on", "true", "1"] else "false"
         precio_oferta_final = f"{offer_price:.2f}" if (offer_price and es_oferta_bool == "true") else ""
+        if es_oferta_bool == "true" and offer_price:
+            if offer_price <= 0:
+                return RedirectResponse(url=f"/proveedor?msg={quote('[ERROR] El precio de oferta debe ser mayor que cero.')}", status_code=status.HTTP_303_SEE_OTHER)
+            if offer_price >= price:
+                return RedirectResponse(url=f"/proveedor?msg={quote('[ERROR] El precio de oferta debe ser menor que el precio base.')}", status_code=status.HTTP_303_SEE_OTHER)
 
         data_payload = {
-            "name": str(name).strip(),
+            "name": nombre_limpio,
             "price": f"{price:.2f}",
             "stock": str(stock),
             "description": description if description else "Producto corporativo inyectado",
@@ -168,9 +211,16 @@ async def add_product(
         }
         files_payload = []
         if img_archivos:
+            if len(img_archivos) > MAX_IMAGENES:
+                return RedirectResponse(url=f"/proveedor?msg={quote(f'[ERROR] Máximo {MAX_IMAGENES} imágenes por producto.')}", status_code=status.HTTP_303_SEE_OTHER)
             for upload_file in img_archivos:
                 if upload_file and getattr(upload_file, "filename", "") != "":
+                    ext = os.path.splitext(upload_file.filename)[1].lower()
+                    if ext not in EXTENSIONES_PERMITIDAS:
+                        return RedirectResponse(url=f"/proveedor?msg={quote('[ERROR] Formato de imagen no permitido.')}", status_code=status.HTTP_303_SEE_OTHER)
                     file_content = await upload_file.read()
+                    if len(file_content) > MAX_IMAGEN_BYTES:
+                        return RedirectResponse(url=f"/proveedor?msg={quote('[ERROR] Imagen demasiado grande (máx 5MB).')}", status_code=status.HTTP_303_SEE_OTHER)
                     if len(file_content) > 0:
                         files_payload.append(
                             ("img_archivos", (upload_file.filename, file_content, upload_file.content_type or "image/jpeg"))
@@ -179,7 +229,7 @@ async def add_product(
         headers = {"Authorization": f"Bearer {token}"}
         async with httpx.AsyncClient() as client:
             res = await client.post(
-                f"{ORDER_SERVICE_URL}/api/orders/catalog/products/", 
+                f"{ORDER_SERVICE_URL}/api/orders/catalog/products/",
                 headers=headers, data=data_payload, files=files_payload if files_payload else None, timeout=20.0
             )
         if res.status_code == 201:
@@ -199,19 +249,20 @@ async def restock_product(request: Request, product_id: int, quantity: str = For
         return RedirectResponse(url="/proveedor?msg=[DENEGADO]", status_code=status.HTTP_303_SEE_OTHER)
     try:
         cantidad_unidades = int(quantity)
+        if cantidad_unidades <= 0:
+            raise ValueError("La cantidad debe ser mayor que cero")
         headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
         async with httpx.AsyncClient() as client:
-            res_get = await client.get(f"{ORDER_SERVICE_URL}/api/orders/catalog/products/{product_id}/", headers=headers, timeout=3.0)
-            if res_get.status_code == 200:
-                current_stock = int(res_get.json().get("stock", 0))
-                new_payload = {"stock": current_stock + cantidad_unidades}
-                res_patch = await client.patch(f"{ORDER_SERVICE_URL}/api/orders/catalog/products/{product_id}/", headers=headers, json=new_payload, timeout=4.0)
-                if res_patch.status_code in [200, 202, 204]:
-                    return RedirectResponse(url=f"/proveedor?msg={quote('[SUCCESS] Reabastecimiento propagado en la malla.')}", status_code=status.HTTP_303_SEE_OTHER)
-                else:
-                    logger.error(f"[BFF PATCH ERROR] Django rechazo con codigo: {res_patch.status_code}")
+            res_post = await client.post(
+                f"{ORDER_SERVICE_URL}/api/orders/catalog/products/{product_id}/restock/",
+                headers=headers,
+                json={"quantity": cantidad_unidades},
+                timeout=4.0,
+            )
+            if res_post.status_code in [200, 201]:
+                return RedirectResponse(url=f"/proveedor?msg={quote('[SUCCESS] Reabastecimiento propagado en la malla.')}", status_code=status.HTTP_303_SEE_OTHER)
             else:
-                logger.error(f"[BFF GET ERROR] No se encontro el producto ID {product_id}")
+                logger.error(f"[BFF RESTOCK ERROR] Django rechazo con codigo: {res_post.status_code}: {res_post.text[:200]}")
     except ValueError:
         logger.error("[BFF RESTOCK ERROR] La cantidad enviada no es un numero entero valido.")
     except Exception as e:
@@ -248,7 +299,7 @@ async def comprador_view(request: Request, msg: str = None):
     vista_actual = "dashboard" if datos.get("role") == "comprador" else "auth_requerida"
     productos_oferta = []
     productos_regulares = []
-    
+
     try:
         async with httpx.AsyncClient() as client:
             res = await client.get(f"{ORDER_SERVICE_URL}/api/orders/catalog/products/", timeout=3.0)
@@ -258,7 +309,7 @@ async def comprador_view(request: Request, msg: str = None):
                 productos_regulares = [p for p in catalogo_completo if p.get('is_offer') is not True]
     except Exception as e:
         logger.error(f"[BFF COMPRADOR] Error al traer catálogo público: {str(e)}")
-        
+
     return templates.TemplateResponse("comprador.html", {
         "request": request,
         "vista": vista_actual,
@@ -273,13 +324,13 @@ async def comprador_register(username: str = Form(...), email: str = Form(...), 
     try:
         async with httpx.AsyncClient() as client:
             res = await client.post(
-                f"{AUTH_SERVICE_URL}/api/auth/register", 
+                f"{AUTH_SERVICE_URL}/api/auth/register",
                 json={
-                    "username": username, 
-                    "email": email, 
-                    "password": password, 
+                    "username": username,
+                    "email": email,
+                    "password": password,
                     "role": "comprador"
-                }, 
+                },
                 timeout=5.0
             )
         if res.status_code == 201:
@@ -322,8 +373,20 @@ async def bff_comprador_checkout(request: Request):
     try:
         body = await request.json()
         items_recibidos = body.get("items", [])
+        if not isinstance(items_recibidos, list) or not items_recibidos:
+            return Response(content='{"error": "El carrito no puede estar vacío."}', status_code=400, media_type="application/json")
+        for item in items_recibidos:
+            if not isinstance(item, dict):
+                return Response(content='{"error": "Formato de ítem inválido."}', status_code=400, media_type="application/json")
+            try:
+                cantidad = int(item.get("quantity", 0))
+            except (TypeError, ValueError):
+                cantidad = 0
+            if cantidad <= 0:
+                return Response(content='{"error": "La cantidad de cada ítem debe ser mayor que cero."}', status_code=400, media_type="application/json")
         user_id = datos.get("sub", 999)
-        payload = {"email": f"user_{user_id}@alimarket.corporate", "items": items_recibidos}
+        email = datos.get("email") or f"user_{user_id}@alimarket.corporate"
+        payload = {"email": email, "items": items_recibidos}
         headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
         async with httpx.AsyncClient() as client:
             res = await client.post(f"{ORDER_SERVICE_URL}/api/orders/checkout/", headers=headers, json=payload, timeout=5.0)
