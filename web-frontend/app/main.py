@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 BASE_DIR = Path(__file__).resolve().parent
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 
-app = FastAPI(title="AliMarket BFF Gateway", version="2026.1.0")
+app = FastAPI(title="Online Market BFF Gateway", version="2026.1.0")
 app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
 
 AUTH_SERVICE_URL = os.getenv("AUTH_SERVICE_URL", "http://auth-service:5000")
@@ -67,7 +67,7 @@ def extraer_datos_de_jwt(token: str):
 
 @app.get("/", response_class=HTMLResponse)
 async def index_view(request: Request, msg: str = None):
-    log_operacion = unquote(msg) if msg else "[SISTEMA] Clúster perimetral AliMarket listo para el despacho."
+    log_operacion = unquote(msg) if msg else "[SISTEMA] Clúster perimetral Online Market listo para el despacho."
     return templates.TemplateResponse("index.html", {"request": request, "logs": log_operacion})
 
 # ==========================================
@@ -97,11 +97,11 @@ async def proveedor_view(request: Request, msg: str = None):
         except Exception as e:
             logger.error(f"[BFF] Error al recuperar catálogo para panel: {str(e)}")
 
-        return templates.TemplateResponse("proveedor.html", {
+        return templates.TemplateResponse("prov.html", {
             "request": request, "vista": "panel", "productos": productos, "msg": mensaje_limpio, "username": datos.get("sub")
         })
     vista_actual = "registro" if count == 0 else "login"
-    return templates.TemplateResponse("proveedor.html", {
+    return templates.TemplateResponse("prov.html", {
         "request": request, "vista": vista_actual, "msg": mensaje_limpio
     })
 
@@ -310,7 +310,7 @@ async def comprador_view(request: Request, msg: str = None):
     except Exception as e:
         logger.error(f"[BFF COMPRADOR] Error al traer catálogo público: {str(e)}")
 
-    return templates.TemplateResponse("comprador.html", {
+    return templates.TemplateResponse("comp.html", {
         "request": request,
         "vista": vista_actual,
         "productos_oferta": productos_oferta,
@@ -385,7 +385,7 @@ async def bff_comprador_checkout(request: Request):
             if cantidad <= 0:
                 return Response(content='{"error": "La cantidad de cada ítem debe ser mayor que cero."}', status_code=400, media_type="application/json")
         user_id = datos.get("sub", 999)
-        email = datos.get("email") or f"user_{user_id}@alimarket.corporate"
+        email = datos.get("email") or f"user_{user_id}@onlinemarket.corporate"
         payload = {"email": email, "items": items_recibidos}
         headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
         async with httpx.AsyncClient() as client:

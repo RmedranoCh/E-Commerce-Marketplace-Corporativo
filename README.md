@@ -1,6 +1,6 @@
-# AliMarket & TechMarket — E-Commerce Marketplace Corporativo
+# E-Commerce Marketplace Corporativo
 
-Marketplace de comercio electrónico con arquitectura de microservicios. AliMarket (para compradores) y TechMarket (para proveedores) funcionan en un mismo sistema donde cada pieza hace su trabajo de forma independiente pero coordinada: los compradores navegan productos, arman su carrito y compran en tiempo real; los proveedores gestionan su inventario, publican productos y controlan stock.
+Marketplace de comercio electrónico con arquitectura de microservicios. Compradores y proveedores funcionan en un mismo sistema donde cada pieza hace su trabajo de forma independiente pero coordinada: los compradores navegan productos, arman su carrito y compran en tiempo real; los proveedores gestionan su inventario, publican productos y controlan stock.
 
 ---
 
@@ -48,7 +48,7 @@ El sistema se organiza como microservicios que se comunican entre sí a través 
 
 - **Compra en tiempo real**: si un producto se agota, desaparece del catálogo sin recargar la página.
 - **Carrito persistente** en el navegador (localStorage) por 7 días.
-- **Panel de proveedor** (Cybercore) con estética cyberpunk: inventario que se actualiza solo, alta de productos con fotos, reabastecimiento y eliminatoria.
+- **Panel de proveedor** (Proveedor) con estética cyberpunk: inventario que se actualiza solo, alta de productos con fotos, reabastecimiento y eliminatoria.
 - **Validación en 3 capas**: navegador, BFF y core (por ejemplo, la descripción de un producto tiene un límite de 250 caracteres aplicado en cada nivel).
 - **Autenticación JWT con RSA (RS256)**: auth-service firma, los demás servicios verifican con la llave pública. Sin secretos compartidos.
 - **Redes Docker aisladas**: `public-gateway`, `backend-mesh` y `data-isolated` (bases de datos sin acceso externo). Todos los servicios corren como usuario no-root.
@@ -111,8 +111,8 @@ El sistema arranca todos los servicios en orden: PostgreSQL se inicializa con su
 
 | URL | Qué es |
 |-----|----------|
-| http://localhost/comprador | Catálogo de comprador (TechMarket) |
-| http://localhost/proveedor | Panel de proveedor (Cybercore) |
+| http://localhost/comprador | Catálogo de comprador (Comprador) |
+| http://localhost/proveedor | Panel de proveedor (Proveedor) |
 | http://localhost/admin | Administración Django de órdenes |
 | http://localhost:15672 | Consola de RabbitMQ (guest / guest) |
 

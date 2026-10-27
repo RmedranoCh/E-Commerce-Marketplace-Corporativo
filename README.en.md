@@ -1,6 +1,6 @@
-# AliMarket & TechMarket — Corporate E-Commerce Marketplace
+# Corporate E-Commerce Marketplace
 
-An e-commerce marketplace built on a microservices architecture. AliMarket (for buyers) and TechMarket (for providers) run in a single system where each piece does its job independently yet works in coordination: buyers browse products, build their cart, and buy in real time; sellers manage their inventory, publish products, and control stock.
+An e-commerce marketplace built on a microservices architecture. Buyers and providers run in a single system where each piece does its job independently yet works in coordination: buyers browse products, build their cart, and buy in real time; sellers manage their inventory, publish products, and control stock.
 
 ---
 
@@ -48,7 +48,7 @@ The system is organized as microservices that talk to each other over internal n
 
 - **Real-time shopping**: when a product sells out, it disappears from the catalog without a page reload.
 - **Persistent cart** in the browser (localStorage) for 7 days.
-- **Provider panel** (Cybercore) with a cyberpunk look: self-updating inventory, product creation with photos, restocking, and removal.
+- **Provider panel** (Proveedor) with a cyberpunk look: self-updating inventory, product creation with photos, restocking, and removal.
 - **3-layer validation**: browser, BFF, and core (for example, a product description has a 250-character limit enforced at every level).
 - **JWT authentication with RSA (RS256)**: auth-service signs, other services verify with the public key. No shared secrets.
 - **Isolated Docker networks**: `public-gateway`, `backend-mesh`, and `data-isolated` (databases with no external access). All services run as a non-root user.
@@ -111,8 +111,8 @@ The system starts all services in order: PostgreSQL initializes its user and dat
 
 | URL | What it is |
 |-----|------------|
-| http://localhost/comprador | Buyer catalog (TechMarket) |
-| http://localhost/proveedor | Provider panel (Cybercore) |
+| http://localhost/comprador | Buyer catalog (Comprador) |
+| http://localhost/proveedor | Provider panel (Proveedor) |
 | http://localhost/admin | Django order administration |
 | http://localhost:15672 | RabbitMQ console (guest / guest) |
 
